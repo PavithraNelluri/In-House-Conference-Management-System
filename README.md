@@ -54,7 +54,7 @@ A web-based system to manage academic conferences, workshops, and seminars.
   - Admin/Subadmin scans QR or marks attendance via the dashboard.
 ### Certificate Distribution
   - Certificates are automatically generated and emailed after attendance.
-### 5. Notifications
+### Notifications
   - Admins/Subadmins can send **event-specific notifications directly from the platform** to all participants via email (e.g., reminders, updates, schedule changes).
     
 ## DEMO Video
