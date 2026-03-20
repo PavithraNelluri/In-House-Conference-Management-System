@@ -5,8 +5,28 @@ A web-based system to manage academic conferences, workshops, and seminars.
 **Team-L | CS 310 Software Engineering | Spring 2026**
 
 ---
+## Table of Contents
+- [Key Features](#key-features)
+- [DEMO Video](#demo-video)
+- [Project Structure](#project-structure)
+- [Folder Explanation (For Beginners)](#folder-explanation-for-beginners)
+- [Installation](#installation)
+- [Guide to add a new Feature](#guide-to-add-a-new-feature)
+- [Contributors](#contributors)
+---
+##  Key Features
 
-## 📁 Project Structure
+-  Super admin / Admin management
+-  Event creation and management
+-  CSV import of participants
+-  QR code generation and email
+-  QR-based attendance marking
+-  Certificate generation and distribution
+-  Notification system
+---
+## DEMO Video
+---
+## Project Structure
 
 ```
 In-House-Conference-Management-System/
@@ -67,8 +87,7 @@ In-House-Conference-Management-System/
 ```
 
 ---
-
-## 🚀 Quick Start
+## Installation
 
 ### Prerequisites
 - Node.js (v18 or higher)
@@ -93,7 +112,7 @@ npm run dev             # Starts dev server on port 5173
 
 ---
 
-## 📂 Folder Explanation (For Beginners)
+## Folder Explanation (For Beginners)
 
 ### Frontend Folders
 
@@ -119,7 +138,7 @@ npm run dev             # Starts dev server on port 5173
 
 ---
 
-## 🔧 How to Add a New Feature
+## Guide to add a new feature
 
 ### Example: Adding a new "Reports" page
 
@@ -142,22 +161,10 @@ npm run dev             # Starts dev server on port 5173
 
 ---
 
-## 👥 Team Members
+## Contributors
 
 - **Devesh Kumar** - 230001024
 - **Kommireddy Jayanthi** - 230001041
 - **Kota Sanjay** - 230001042
 - **Nandini Kumari** - 230001056
 - **Nelluri Pavithra** - 230001057
-
----
-
-## 📝 Key Features (from SRS)
-
-- ✅ Super admin / Admin management
-- ✅ Event creation and management
-- ✅ CSV import of participants
-- ✅ QR code generation and email
-- ✅ QR-based attendance marking
-- ✅ Certificate generation and distribution
-- ✅ Notification system
