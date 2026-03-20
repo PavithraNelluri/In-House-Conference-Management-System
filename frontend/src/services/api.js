@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'https://notesap-d6bmg8f7a2btcjdb.centralindia-01.azurewebsites.net/api';
+const DEFAULT_API_URL = 'http://localhost:5000/api';
+const API_URL = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 
 // Create axios instance
 const api = axios.create({
