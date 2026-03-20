@@ -42,19 +42,19 @@ A web-based system to manage academic conferences, workshops, and seminars.
 - Cannot create events  
 - Can manage events and attendance assigned to them 
 ## System Workflow
-### Event Creation
+#### 1. Event Creation
   - Admin creates an event with the necessary details.
-### Participant Import
+#### 2. Participant Import
   - Upload a CSV file containing participants who have registered and paid.
-### Receipt Generation
+#### 3. Receipt Generation
   - System generates and sends receipts via email.
-### QR Code Distribution
+#### 4. QR Code Distribution
   - Unique QR codes are generated and emailed to participants.
-### Attendance Marking
+#### 5. Attendance Marking
   - Admin/Subadmin scans QR or marks attendance via the dashboard.
-### Certificate Distribution
+#### 6. Certificate Distribution
   - Certificates are automatically generated and emailed after attendance.
-### Notifications
+#### 7. Notifications
   - Admins/Subadmins can send **event-specific notifications directly from the platform** to all participants via email (e.g., reminders, updates, schedule changes).
     
 ## DEMO Video
