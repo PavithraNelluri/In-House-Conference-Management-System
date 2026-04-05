@@ -1,116 +1,40 @@
-import PDFDocument from 'pdfkit';
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
-// Generate certificate PDF as buffer
-export const generateCertificate = async (participantName, eventName, eventDate) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        size: 'A4',
-        layout: 'landscape',
-        margin: 50
-      });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-      const chunks = [];
-      doc.on('data', chunk => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+export const generateCertificate = async (data) => {
+  const { name, department, coords } = data;
 
-      // Certificate border
-      doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40)
-         .lineWidth(3)
-         .stroke('#2c3e50');
+  const templatePath = path.join(__dirname, '..', '..', 'Certificate_participation.pdf');
+  const templateBytes = fs.readFileSync(templatePath);
 
-      doc.rect(30, 30, doc.page.width - 60, doc.page.height - 60)
-         .lineWidth(1)
-         .stroke('#3498db');
+  const pdfDoc = await PDFDocument.load(templateBytes);
+  const page = pdfDoc.getPages()[0];
 
-      // Header
-      doc.fontSize(16)
-         .fillColor('#666')
-         .text('IN-HOUSE CONFERENCE MANAGEMENT SYSTEM', { align: 'center' });
+  const pdfHeight = page.getHeight();
 
-      doc.moveDown(1);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-      // Title
-      doc.fontSize(40)
-         .fillColor('#2c3e50')
-         .font('Helvetica-Bold')
-         .text('CERTIFICATE', { align: 'center' });
-
-      doc.moveDown(0.5);
-
-      doc.fontSize(20)
-         .fillColor('#3498db')
-         .font('Helvetica')
-         .text('OF PARTICIPATION', { align: 'center' });
-
-      doc.moveDown(2);
-
-      // Body
-      doc.fontSize(14)
-         .fillColor('#666')
-         .font('Helvetica')
-         .text('This is to certify that', { align: 'center' });
-
-      doc.moveDown(0.8);
-
-      // Participant name
-      doc.fontSize(28)
-         .fillColor('#2c3e50')
-         .font('Helvetica-Bold')
-         .text(participantName.toUpperCase(), { align: 'center' });
-
-      doc.moveDown(0.8);
-
-      // Event info
-      doc.fontSize(14)
-         .fillColor('#666')
-         .font('Helvetica')
-         .text('has successfully participated in', { align: 'center' });
-
-      doc.moveDown(0.5);
-
-      doc.fontSize(22)
-         .fillColor('#3498db')
-         .font('Helvetica-Bold')
-         .text(eventName, { align: 'center' });
-
-      doc.moveDown(0.5);
-
-      // Date
-      const formattedDate = new Date(eventDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-
-      doc.fontSize(14)
-         .fillColor('#666')
-         .font('Helvetica')
-         .text(`held on ${formattedDate}`, { align: 'center' });
-
-      doc.moveDown(3);
-
-      // Signature line
-      doc.fontSize(12)
-         .fillColor('#333')
-         .text('_________________________', { align: 'center' });
-      
-      doc.moveDown(0.3);
-      
-      doc.fontSize(10)
-         .fillColor('#666')
-         .text('Authorized Signature', { align: 'center' });
-
-      // Footer
-      doc.moveDown(2);
-      doc.fontSize(8)
-         .fillColor('#999')
-         .text(`Certificate ID: ${Date.now()}`, { align: 'center' });
-
-      doc.end();
-    } catch (error) {
-      reject(error);
-    }
+  // ✅ SIMPLE: no scaling, just flip Y
+  page.drawText(name, {
+    x: coords.name.x,
+    y: pdfHeight - coords.name.y,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
   });
+
+  page.drawText(department, {
+    x: coords.department.x,
+    y: pdfHeight - coords.department.y,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0),
+  });
+
+  return Buffer.from(await pdfDoc.save());
 };

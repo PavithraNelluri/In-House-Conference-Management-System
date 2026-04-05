@@ -10,7 +10,8 @@ import {
     sendReceipts,
     sendNotifications,
     assignUserToEvent,
-    unassignUserFromEvent
+    unassignUserFromEvent,
+   previewCertificate
 } from '../services/api';
 import { usePage } from '../contexts/PageContext';
 import StatCard from '../components/StatCard';
@@ -44,7 +45,15 @@ function EventDetail() {
     const [confirmAction, setConfirmAction] = useState(null);
     const [importConfirm, setImportConfirm] = useState(null);
     const fileInputRef = useRef(null);
-
+    //Certificate config
+const [certificateConfig, setCertificateConfig] = useState({
+  coords: {
+    name: { x: 240, y: 166 },
+    department: { x: 148, y: 187 }
+  }
+});
+const [pdfUrl, setPdfUrl] = useState(null);
+const [showCertPreview, setShowCertPreview] = useState(false);
     useEffect(() => { loadData(); }, [id]);
     useEffect(() => {
         if (event && canManageAssignments(event)) {
@@ -67,7 +76,18 @@ function EventDetail() {
             );
         }
     }, [event, participants.length, actionLoading]);
-
+useEffect(() => {
+  if (showCertPreview) {
+    previewCertificate(id, {
+      ...certificateConfig,
+      previewWidth: 600,
+      previewHeight: 394
+    }).then(res => {
+      const url = URL.createObjectURL(res.data);
+      setPdfUrl(url);
+    });
+  }
+}, [showCertPreview]);
     const loadData = async () => {
         try {
             const [eventRes, participantsRes] = await Promise.all([getEvent(id), getParticipants(id)]);
@@ -213,9 +233,14 @@ function EventDetail() {
                 <button onClick={() => requestAction(sendReceipts, 'Receipts', `This will send receipt emails to ${withPayment} participants with payment data.`)} className="btn-secondary" disabled={!!actionLoading || withPayment === 0}>
                     {actionLoading === 'Receipts' ? 'Sending...' : 'Send Receipts'}
                 </button>
-                <button onClick={() => requestAction(sendCertificates, 'Certificates', `This will send certificates to ${attendedCount} attended participants. Make sure attendance is finalized.`)} className="btn-secondary" disabled={!!actionLoading || attendedCount === 0}>
-                    {actionLoading === 'Certificates' ? 'Sending...' : 'Send Certificates'}
-                </button>
+                
+<button 
+  onClick={() => setShowCertPreview(true)}
+  className="btn-secondary"
+>
+  Send Certificates
+</button>
+
             </div>
 
             <div className="stats-grid">
@@ -238,7 +263,81 @@ function EventDetail() {
                     <h4>Optional: phone, transactionId, transactionTime, amount, paymentMode</h4>
                 </div>
             </Modal>
+            
+            {/*certificate modal*/}
+            <Modal 
+  isOpen={showCertPreview} 
+  onClose={() => setShowCertPreview(false)} 
+  title="Preview Certificate"
+>
+  <div style={{ textAlign: 'center' }}>
+    
+   {/* Certificate Preview */}
+<div 
+  style={{ 
+    position: 'relative', 
+    display: 'inline-block',
+    cursor: 'crosshair' // optional: helps while clicking
+  }}
+  onClick={(e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
 
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    console.log("Clicked (preview coords):", {
+      x: Math.round(x),
+      y: Math.round(y)
+    });
+    console.log("Width:", rect.width);
+console.log("Height:", rect.height);
+    console.log("Use these in config directly (TOP-LEFT system)");
+  }}
+>
+{pdfUrl ? (
+  <iframe
+    src={pdfUrl}
+    width="100%"
+    height="500px"
+    style={{ border: 'none' }}
+  />
+) : (
+  <p>Loading preview...</p>
+)}
+  
+</div>
+
+<p style={{ marginTop: 10 }}>
+  This preview shows how certificates will look.
+</p>
+
+<div className="modal-form-actions">
+  <button 
+    className="btn-secondary"
+    onClick={() => setShowCertPreview(false)}
+  >
+    Cancel
+  </button>
+
+  <button 
+    className="btn-primary"
+    onClick={async () => {
+      setShowCertPreview(false);
+
+await requestAction(
+  (id) => sendCertificates(id, {
+    ...certificateConfig
+  }),
+  'Certificates',
+  `This will send certificates to ${attendedCount} participants.`
+);
+    }}
+  >
+    Confirm & Send
+  </button>
+</div>
+  </div>
+</Modal>
             {/* Notification Modal */}
             <Modal isOpen={showNotify} onClose={() => setShowNotify(false)} title="Send Notification">
                 <div className="warning-box">This will send an email to all {participants.length} participants.</div>

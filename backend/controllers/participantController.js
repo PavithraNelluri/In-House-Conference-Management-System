@@ -200,9 +200,67 @@ export const markAttendance = async (req, res) => {
 };
 
 // Send certificates with PDF
+// export const sendCertificates = async (req, res) => {
+//   try {
+//     const { eventId } = req.params;
+//     const { participantIds } = req.body;
+
+//     const { event, status, body } = await loadAccessibleEvent(eventId, req.user);
+//     if (!event) {
+//       return res.status(status).json(body);
+//     }
+
+//     let query = { event: eventId, attended: true };
+//     if (participantIds && participantIds.length > 0) {
+//       query._id = { $in: participantIds };
+//     }
+
+//     const participants = await Participant.find(query);
+//     let sentCount = 0;
+
+//     for (const p of participants) {
+//       try {
+//         const pdfBuffer = await generateCertificate(p.name, event.name, event.date);
+
+//         await sendEmail({
+//           to: p.email,
+//           subject: `Your Certificate - ${event.name}`,
+//           html: `
+//             <h2>Congratulations ${p.name}!</h2>
+//             <p>Thank you for participating in <strong>${event.name}</strong>.</p>
+//             <p>Please find your Certificate of Participation attached as a PDF.</p>
+//             <br>
+//             <p>Best regards,<br>ICMS Team</p>
+//           `,
+//           attachments: [{
+//             filename: `Certificate_${p.name.replace(/\s/g, '_')}.pdf`,
+//             content: pdfBuffer,
+//             contentType: 'application/pdf'
+//           }]
+//         });
+//         sentCount++;
+//       } catch (err) {
+//         console.error(`Failed to send certificate to ${p.email}:`, err);
+//       }
+//     }
+
+//     res.json({ message: `Certificates sent to ${sentCount} participants` });
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
+//updated
+// Send certificates with PDF
 export const sendCertificates = async (req, res) => {
   try {
     const { eventId } = req.params;
+
+    // ✅ NEW: get coordinates from frontend
+    const coords = req.body.coords || {
+      name: { x: 300, y: 250 },
+      department: { x: 250, y: 300 }
+    };
     const { participantIds } = req.body;
 
     const { event, status, body } = await loadAccessibleEvent(eventId, req.user);
@@ -212,7 +270,11 @@ export const sendCertificates = async (req, res) => {
 
     let query = { event: eventId, attended: true };
     if (participantIds && participantIds.length > 0) {
-      query._id = { $in: participantIds };
+        query = {
+    event: eventId,
+    attended: true,
+    _id: { $in: participantIds }
+  };
     }
 
     const participants = await Participant.find(query);
@@ -220,7 +282,12 @@ export const sendCertificates = async (req, res) => {
 
     for (const p of participants) {
       try {
-        const pdfBuffer = await generateCertificate(p.name, event.name, event.date);
+        // ✅ FIXED: use coordinates instead of event.name/date
+        const pdfBuffer = await generateCertificate({
+  name: p.name,
+  department: p.department || "Department",
+  coords
+        });
 
         await sendEmail({
           to: p.email,
@@ -238,6 +305,7 @@ export const sendCertificates = async (req, res) => {
             contentType: 'application/pdf'
           }]
         });
+
         sentCount++;
       } catch (err) {
         console.error(`Failed to send certificate to ${p.email}:`, err);
@@ -245,11 +313,32 @@ export const sendCertificates = async (req, res) => {
     }
 
     res.json({ message: `Certificates sent to ${sentCount} participants` });
+
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
+//preview cetficate 
+export const previewCertificate = async (req, res) => {
+  try {
+    const { coords, previewWidth, previewHeight } = req.body;
+
+    const pdfBuffer = await generateCertificate({
+      name: "Nandini",
+      department: "Department",
+      coords,
+      previewWidth,
+      previewHeight
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    res.status(500).json({ message: "Preview failed" });
+  }
+};
 // Send payment receipts
 export const sendReceipts = async (req, res) => {
   try {

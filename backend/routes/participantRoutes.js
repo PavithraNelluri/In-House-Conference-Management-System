@@ -15,5 +15,5 @@ router.post('/attendance', participantController.markAttendance);
 router.post('/send-certificates/:eventId', participantController.sendCertificates);
 router.post('/send-receipts/:eventId', participantController.sendReceipts);
 router.post('/notify/:eventId', participantController.sendNotifications);
-
+router.post('/preview-certificate/:eventId', participantController.previewCertificate);
 export default router;
