@@ -256,10 +256,14 @@ export const sendCertificates = async (req, res) => {
   try {
     const { eventId } = req.params;
 
-    // ✅ NEW: get coordinates from frontend
+    // Get coordinates and font sizes from frontend (with defaults)
     const coords = req.body.coords || {
-      name: { x: 300, y: 250 },
-      department: { x: 250, y: 300 }
+      name: { x: 240, y: 166 },
+      department: { x: 148, y: 187 }
+    };
+    const fontSize = req.body.fontSize || {
+      name: 11,
+      department: 11
     };
     const { participantIds } = req.body;
 
@@ -270,11 +274,7 @@ export const sendCertificates = async (req, res) => {
 
     let query = { event: eventId, attended: true };
     if (participantIds && participantIds.length > 0) {
-        query = {
-    event: eventId,
-    attended: true,
-    _id: { $in: participantIds }
-  };
+      query._id = { $in: participantIds };
     }
 
     const participants = await Participant.find(query);
@@ -282,11 +282,11 @@ export const sendCertificates = async (req, res) => {
 
     for (const p of participants) {
       try {
-        // ✅ FIXED: use coordinates instead of event.name/date
         const pdfBuffer = await generateCertificate({
-  name: p.name,
-  department: p.department || "Department",
-  coords
+          name: p.name,
+          department: p.department || "Department",
+          coords,
+          fontSize
         });
 
         await sendEmail({
@@ -313,30 +313,29 @@ export const sendCertificates = async (req, res) => {
     }
 
     res.json({ message: `Certificates sent to ${sentCount} participants` });
-
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-//preview cetficate 
+// Preview certificate with dynamic coordinates and font sizes
 export const previewCertificate = async (req, res) => {
   try {
-    const { coords, previewWidth, previewHeight } = req.body;
+    const { coords, fontSize } = req.body;
 
+    // Use sample data for preview
     const pdfBuffer = await generateCertificate({
-      name: "Nandini",
-      department: "Department",
+      name: "Sample Name",
+      department: "Sample Department",
       coords,
-      previewWidth,
-      previewHeight
+      fontSize
     });
 
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdfBuffer);
-
   } catch (err) {
-    res.status(500).json({ message: "Preview failed" });
+    console.error('Preview generation failed:', err);
+    res.status(500).json({ message: "Preview failed", error: err.message });
   }
 };
 // Send payment receipts
