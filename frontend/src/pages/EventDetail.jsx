@@ -11,7 +11,7 @@ import {
     sendNotifications,
     assignUserToEvent,
     unassignUserFromEvent,
-   previewCertificate
+    previewCertificate
 } from '../services/api';
 import { usePage } from '../contexts/PageContext';
 import StatCard from '../components/StatCard';
@@ -20,8 +20,9 @@ import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Toast from '../components/Toast';
+import '../styles//EventDetail.css';
 
-const IconUsers = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>;
+const IconUsers = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /></svg>;
 const IconCheck = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
 const IconCreditCard = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>;
 
@@ -45,15 +46,35 @@ function EventDetail() {
     const [confirmAction, setConfirmAction] = useState(null);
     const [importConfirm, setImportConfirm] = useState(null);
     const fileInputRef = useRef(null);
-    //Certificate config
-const [certificateConfig, setCertificateConfig] = useState({
-  coords: {
-    name: { x: 240, y: 166 },
-    department: { x: 148, y: 187 }
-  }
-});
-const [pdfUrl, setPdfUrl] = useState(null);
-const [showCertPreview, setShowCertPreview] = useState(false);
+
+    // Certificate config with font sizes
+    const [certificateConfig, setCertificateConfig] = useState({
+        coords: {
+            name: { x: 363, y: 279 },
+            department: { x: 364, y: 306 }
+        },
+        fontSize: {
+            name: 11,
+            department: 11
+        }
+    });
+
+    // Temporary state for form inputs (before running preview)
+    const [tempConfig, setTempConfig] = useState({
+        coords: {
+            name: { x: 240, y: 166 },
+            department: { x: 148, y: 187 }
+        },
+        fontSize: {
+            name: 11,
+            department: 11
+        }
+    });
+
+    const [pdfUrl, setPdfUrl] = useState(null);
+    const [showCertPreview, setShowCertPreview] = useState(false);
+    const [previewLoading, setPreviewLoading] = useState(false);
+
     useEffect(() => { loadData(); }, [id]);
     useEffect(() => {
         if (event && canManageAssignments(event)) {
@@ -76,25 +97,45 @@ const [showCertPreview, setShowCertPreview] = useState(false);
             );
         }
     }, [event, participants.length, actionLoading]);
-useEffect(() => {
-  if (showCertPreview) {
-    previewCertificate(id, {
-      ...certificateConfig,
-      previewWidth: 600,
-      previewHeight: 394
-    }).then(res => {
-      const url = URL.createObjectURL(res.data);
-      setPdfUrl(url);
-    });
-  }
-}, [showCertPreview]);
+
+    // Load initial preview when modal opens
+    useEffect(() => {
+        if (showCertPreview && !pdfUrl) {
+            handleRunPreview();
+        }
+    }, [showCertPreview]);
+
+    const handleRunPreview = async () => {
+        setPreviewLoading(true);
+        try {
+            const res = await previewCertificate(id, {
+                ...tempConfig,
+                previewWidth: 600,
+                previewHeight: 394
+            });
+            const url = URL.createObjectURL(res.data);
+            setPdfUrl(url);
+            // Update main config after successful preview
+            setCertificateConfig(tempConfig);
+        } catch (err) {
+            console.error('Failed to load preview:', err);
+            setToast({ message: 'Failed to load certificate preview', type: 'error' });
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
     const loadData = async () => {
         try {
             const [eventRes, participantsRes] = await Promise.all([getEvent(id), getParticipants(id)]);
             setEvent(eventRes.data);
             setParticipants(participantsRes.data);
-        } catch (error) { console.error('Failed to load data:', error); }
-        finally { setLoading(false); }
+        } catch (error) {
+            console.error('Failed to load data:', error);
+        }
+        finally {
+            setLoading(false);
+        }
     };
 
     const getCurrentUserId = () => currentUser.id || currentUser._id;
@@ -118,17 +159,24 @@ useEffect(() => {
         const example = 'John Doe,john@example.com,9876543210,TXN123456,2026-02-09 10:30,500,UPI';
         const blob = new Blob([`${headers}\n${example}`], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'participants_template.csv'; a.click();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'participants_template.csv';
+        a.click();
         URL.revokeObjectURL(url);
     };
 
     const handleFileUpload = (e) => {
-        const file = e.target.files[0]; if (!file) return;
+        const file = e.target.files[0];
+        if (!file) return;
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
                 const lines = event.target.result.split('\n').filter(l => l.trim());
-                if (lines.length < 2) { setToast({ message: 'CSV file is empty', type: 'error' }); return; }
+                if (lines.length < 2) {
+                    setToast({ message: 'CSV file is empty', type: 'error' });
+                    return;
+                }
                 const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
                 const parsed = [];
                 for (let i = 1; i < lines.length; i++) {
@@ -147,11 +195,17 @@ useEffect(() => {
                     });
                     if (p.name && p.email) parsed.push(p);
                 }
-                if (parsed.length === 0) { setToast({ message: 'No valid participants found', type: 'error' }); return; }
+                if (parsed.length === 0) {
+                    setToast({ message: 'No valid participants found', type: 'error' });
+                    return;
+                }
                 setImportConfirm({ count: parsed.length, data: parsed });
-            } catch { setToast({ message: 'Failed to parse CSV', type: 'error' }); }
+            } catch {
+                setToast({ message: 'Failed to parse CSV', type: 'error' });
+            }
         };
-        reader.readAsText(file); e.target.value = '';
+        reader.readAsText(file);
+        e.target.value = '';
     };
 
     const doImport = async () => {
@@ -159,9 +213,14 @@ useEffect(() => {
         try {
             const response = await importParticipants(id, importConfirm.data);
             setToast({ message: response.data.message, type: 'success' });
-            setShowImport(false); loadData();
-        } catch { setToast({ message: 'Failed to import', type: 'error' }); }
-        finally { setImportConfirm(null); }
+            setShowImport(false);
+            loadData();
+        } catch {
+            setToast({ message: 'Failed to import', type: 'error' });
+        }
+        finally {
+            setImportConfirm(null);
+        }
     };
 
     const requestAction = (action, label, warning) => setConfirmAction({ action, label, warning });
@@ -169,16 +228,34 @@ useEffect(() => {
     const executeAction = async () => {
         if (!confirmAction) return;
         const { action, label } = confirmAction;
-        setConfirmAction(null); setActionLoading(label);
-        try { const res = await action(id); setToast({ message: res.data.message, type: 'success' }); }
-        catch { setToast({ message: `Failed: ${label}`, type: 'error' }); }
-        finally { setActionLoading(''); }
+        setConfirmAction(null);
+        setActionLoading(label);
+        try {
+            const res = await action(id);
+            setToast({ message: res.data.message, type: 'success' });
+        }
+        catch {
+            setToast({ message: `Failed: ${label}`, type: 'error' });
+        }
+        finally {
+            setActionLoading('');
+        }
     };
 
     const handleSendNotification = async () => {
-        if (!notification.subject.trim() || !notification.message.trim()) { setToast({ message: 'Subject and message are required', type: 'error' }); return; }
-        try { const res = await sendNotifications(id, notification); setToast({ message: res.data.message, type: 'success' }); setShowNotify(false); setNotification({ subject: '', message: '' }); }
-        catch { setToast({ message: 'Failed to send notifications', type: 'error' }); }
+        if (!notification.subject.trim() || !notification.message.trim()) {
+            setToast({ message: 'Subject and message are required', type: 'error' });
+            return;
+        }
+        try {
+            const res = await sendNotifications(id, notification);
+            setToast({ message: res.data.message, type: 'success' });
+            setShowNotify(false);
+            setNotification({ subject: '', message: '' });
+        }
+        catch {
+            setToast({ message: 'Failed to send notifications', type: 'error' });
+        }
     };
 
     const handleAssignUser = async () => {
@@ -213,6 +290,12 @@ useEffect(() => {
         }
     };
 
+    const handleCertPreviewOpen = () => {
+        setPdfUrl(null);
+        setTempConfig(certificateConfig);
+        setShowCertPreview(true);
+    };
+
     if (loading) return <div className="loading"><div className="spinner"></div> Loading...</div>;
     if (!event) return <div className="empty-state"><p>Event not found</p></div>;
 
@@ -227,20 +310,20 @@ useEffect(() => {
     return (
         <div>
             <div className="action-buttons">
-                <button onClick={() => requestAction(sendQRCodes, 'QR Codes', `This will send QR code emails to all ${participants.length} participants.`)} className="btn-secondary" disabled={!!actionLoading || participants.length === 0}>
+                <button onClick={() => requestAction(sendQRCodes, 'QR Codes', `This will send QR code emails to all ${participants.length} participants.`)} className="btn-secondary" disabled={!!actionLoading}>
                     {actionLoading === 'QR Codes' ? 'Sending...' : 'Send QR Codes'}
                 </button>
                 <button onClick={() => requestAction(sendReceipts, 'Receipts', `This will send receipt emails to ${withPayment} participants with payment data.`)} className="btn-secondary" disabled={!!actionLoading || withPayment === 0}>
                     {actionLoading === 'Receipts' ? 'Sending...' : 'Send Receipts'}
                 </button>
-                
-<button 
-  onClick={() => setShowCertPreview(true)}
-  className="btn-secondary"
->
-  Send Certificates
-</button>
 
+                <button
+                    onClick={handleCertPreviewOpen}
+                    className="btn-secondary"
+                    disabled={!!actionLoading || attendedCount === 0}
+                >
+                    Send Certificates
+                </button>
             </div>
 
             <div className="stats-grid">
@@ -263,92 +346,288 @@ useEffect(() => {
                     <h4>Optional: phone, transactionId, transactionTime, amount, paymentMode</h4>
                 </div>
             </Modal>
-            
-            {/*certificate modal*/}
-            <Modal 
-  isOpen={showCertPreview} 
-  onClose={() => setShowCertPreview(false)} 
-  title="Preview Certificate"
->
-  <div style={{ textAlign: 'center' }}>
-    
-   {/* Certificate Preview */}
-<div 
-  style={{ 
-    position: 'relative', 
-    display: 'inline-block',
-    cursor: 'crosshair' // optional: helps while clicking
-  }}
-  onClick={(e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
 
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+            {/* Certificate Configuration Modal */}
+            <Modal
+                isOpen={showCertPreview}
+                onClose={() => setShowCertPreview(false)}
+                title="Configure & Preview Certificate"
+                size="xl"
+            >
+                <div className="cert-preview-container">
+                    {/* Left: Certificate Preview */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div className="cert-preview-wrapper">
+                            {previewLoading ? (
+                                <div style={{ width: '600px', height: '394px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p>Generating preview...</p>
+                                </div>
+                            ) : pdfUrl ? (
+                                <iframe
+                                    src={pdfUrl}
+                                    width="600"
+                                    height="394"
+                                    style={{ border: 'none', display: 'block' }}
+                                    id="cert-preview-iframe"
+                                />
+                            ) : (
+                                <div style={{ width: '600px', height: '394px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p>Click "Run Preview" to generate certificate preview</p>
+                                </div>
+                            )}
+                        </div>
 
-    console.log("Clicked (preview coords):", {
-      x: Math.round(x),
-      y: Math.round(y)
-    });
-    console.log("Width:", rect.width);
-console.log("Height:", rect.height);
-    console.log("Use these in config directly (TOP-LEFT system)");
-  }}
->
-{pdfUrl ? (
-  <iframe
-    src={pdfUrl}
-    width="100%"
-    height="500px"
-    style={{ border: 'none' }}
-  />
-) : (
-  <p>Loading preview...</p>
-)}
-  
-</div>
+                        <p style={{ fontSize: '12px', color: '#7f8c8d', margin: '0' }}>
+                            Adjust settings below and click "Run Preview" to see changes
+                        </p>
+                    </div>
 
-<p style={{ marginTop: 10 }}>
-  This preview shows how certificates will look.
-</p>
+                    {/* Right: Control Panel */}
+                    <div className="cert-controls">
+                        {/* Name Configuration */}
+                        <div className="cert-field-group">
+                            <h4>Name Position & Font</h4>
 
-<div className="modal-form-actions">
-  <button 
-    className="btn-secondary"
-    onClick={() => setShowCertPreview(false)}
-  >
-    Cancel
-  </button>
+                            <div className="cert-coord-inputs">
+                                <div className="cert-coord-input">
+                                    <label>X Coordinate</label>
+                                    <input
+                                        type="number"
+                                        value={tempConfig.coords.name.x}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                name: { ...prev.coords.name, x: parseInt(e.target.value) || 0 }
+                                            }
+                                        }))}
+                                        min="0"
+                                        max="600"
+                                    />
+                                </div>
 
-  <button 
-    className="btn-primary"
-    onClick={async () => {
-      setShowCertPreview(false);
+                                <div className="cert-coord-input">
+                                    <label>Y Coordinate</label>
+                                    <input
+                                        type="number"
+                                        value={tempConfig.coords.name.y}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                name: { ...prev.coords.name, y: parseInt(e.target.value) || 0 }
+                                            }
+                                        }))}
+                                        min="0"
+                                        max="394"
+                                    />
+                                </div>
+                            </div>
 
-await requestAction(
-  (id) => sendCertificates(id, {
-    ...certificateConfig
-  }),
-  'Certificates',
-  `This will send certificates to ${attendedCount} participants.`
-);
-    }}
-  >
-    Confirm & Send
-  </button>
-</div>
-  </div>
-</Modal>
+                            <div style={{ marginTop: '10px' }}>
+                                <div className="cert-coord-slider">
+                                    <label>X Slider</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="600"
+                                        value={tempConfig.coords.name.x}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                name: { ...prev.coords.name, x: parseInt(e.target.value) }
+                                            }
+                                        }))}
+                                    />
+                                </div>
+
+                                <div className="cert-coord-slider" style={{ marginTop: '10px' }}>
+                                    <label>Y Slider</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="394"
+                                        value={tempConfig.coords.name.y}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                name: { ...prev.coords.name, y: parseInt(e.target.value) }
+                                            }
+                                        }))}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Font Size for Name */}
+                            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #ddd' }}>
+                                <div className="cert-coord-slider">
+                                    <label>Font Size: {tempConfig.fontSize.name}pt</label>
+                                    <input
+                                        type="range"
+                                        min="6"
+                                        max="32"
+                                        value={tempConfig.fontSize.name}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            fontSize: {
+                                                ...prev.fontSize,
+                                                name: parseInt(e.target.value)
+                                            }
+                                        }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Department Configuration */}
+                        <div className="cert-field-group">
+                            <h4>Department Position & Font</h4>
+
+                            <div className="cert-coord-inputs">
+                                <div className="cert-coord-input">
+                                    <label>X Coordinate</label>
+                                    <input
+                                        type="number"
+                                        value={tempConfig.coords.department.x}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                department: { ...prev.coords.department, x: parseInt(e.target.value) || 0 }
+                                            }
+                                        }))}
+                                        min="0"
+                                        max="600"
+                                    />
+                                </div>
+
+                                <div className="cert-coord-input">
+                                    <label>Y Coordinate</label>
+                                    <input
+                                        type="number"
+                                        value={tempConfig.coords.department.y}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                department: { ...prev.coords.department, y: parseInt(e.target.value) || 0 }
+                                            }
+                                        }))}
+                                        min="0"
+                                        max="394"
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '10px' }}>
+                                <div className="cert-coord-slider">
+                                    <label>X Slider</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="600"
+                                        value={tempConfig.coords.department.x}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                department: { ...prev.coords.department, x: parseInt(e.target.value) }
+                                            }
+                                        }))}
+                                    />
+                                </div>
+
+                                <div className="cert-coord-slider" style={{ marginTop: '10px' }}>
+                                    <label>Y Slider</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="394"
+                                        value={tempConfig.coords.department.y}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            coords: {
+                                                ...prev.coords,
+                                                department: { ...prev.coords.department, y: parseInt(e.target.value) }
+                                            }
+                                        }))}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Font Size for Department */}
+                            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #ddd' }}>
+                                <div className="cert-coord-slider">
+                                    <label>Font Size: {tempConfig.fontSize.department}pt</label>
+                                    <input
+                                        type="range"
+                                        min="6"
+                                        max="32"
+                                        value={tempConfig.fontSize.department}
+                                        onChange={(e) => setTempConfig(prev => ({
+                                            ...prev,
+                                            fontSize: {
+                                                ...prev.fontSize,
+                                                department: parseInt(e.target.value)
+                                            }
+                                        }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Run Preview Button */}
+                        <button
+                            className="btn-primary"
+                            onClick={handleRunPreview}
+                            disabled={previewLoading}
+                            style={{ width: '100%' }}
+                        >
+                            {previewLoading ? 'Generating...' : '▶ Run Preview'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="modal-form-actions" style={{ marginTop: '20px' }}>
+                    <button
+                        className="btn-secondary"
+                        onClick={() => setShowCertPreview(false)}
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        className="btn-primary"
+                        onClick={async () => {
+                            setShowCertPreview(false);
+                            await requestAction(
+                                (id) => sendCertificates(id, {
+                                    ...certificateConfig
+                                }),
+                                'Certificates',
+                                `This will send certificates to ${attendedCount} participants.`
+                            );
+                        }}
+                    >
+                        Confirm & Send
+                    </button>
+                </div>
+            </Modal>
+
             {/* Notification Modal */}
             <Modal isOpen={showNotify} onClose={() => setShowNotify(false)} title="Send Notification">
                 <div className="warning-box">This will send an email to all {participants.length} participants.</div>
-                <div className="form-group"><label>Subject</label><input type="text" value={notification.subject} onChange={(e) => setNotification({ ...notification, subject: e.target.value })} placeholder="Notification subject" /></div>
-                <div className="form-group"><label>Message</label><textarea value={notification.message} onChange={(e) => setNotification({ ...notification, message: e.target.value })} placeholder="Write your message..." rows="4" /></div>
+                <div className="form-group"><label>Subject</label><input type="text" value={notification.subject} onChange={(e) => setNotification({ ...notification, subject: e.target.value })} placeholder="e.g., Thank You for Attending" /></div>
+                <div className="form-group"><label>Message</label><textarea value={notification.message} onChange={(e) => setNotification({ ...notification, message: e.target.value })} placeholder="Enter your message here..." rows="5"></textarea></div>
                 <div className="modal-form-actions">
                     <button className="btn-secondary" onClick={() => setShowNotify(false)}>Cancel</button>
                     <button className="btn-primary" onClick={handleSendNotification}>Send to All</button>
                 </div>
             </Modal>
 
+            {/* Assignments Modal */}
             <Modal isOpen={showAssignments} onClose={() => setShowAssignments(false)} title="Manage Event Access" size="lg">
                 <div className="form-row">
                     <div>
@@ -417,8 +696,8 @@ await requestAction(
                 </div>
             </Modal>
 
-            <ConfirmDialog isOpen={!!confirmAction} onClose={() => setConfirmAction(null)} onConfirm={executeAction} title={`Send ${confirmAction?.label || ''}?`} message={confirmAction?.warning || 'Are you sure?'} confirmText={`Send ${confirmAction?.label || ''}`} />
-            <ConfirmDialog isOpen={!!importConfirm} onClose={() => setImportConfirm(null)} onConfirm={doImport} title="Confirm Import" message={`Found ${importConfirm?.count || 0} valid participants. Proceed?`} confirmText="Import" />
+            <ConfirmDialog isOpen={!!confirmAction} onClose={() => setConfirmAction(null)} onConfirm={executeAction} title={`Send ${confirmAction?.label || ''}?`} message={confirmAction?.warning} />
+            <ConfirmDialog isOpen={!!importConfirm} onClose={() => setImportConfirm(null)} onConfirm={doImport} title="Confirm Import" message={`Found ${importConfirm?.count || 0} valid participants to import.`} />
 
             <h2 className="section-title">Participants</h2>
             {participants.length === 0 ? (
@@ -434,8 +713,11 @@ await requestAction(
                             <tbody>
                                 {participants.map(p => (
                                     <tr key={p._id}>
-                                        <td>{p.name}</td><td>{p.email}</td><td>{p.phone || '—'}</td>
-                                        <td>{p.transactionId || '—'}</td><td>{p.amount ? `₹${p.amount}` : '—'}</td>
+                                        <td>{p.name}</td>
+                                        <td>{p.email}</td>
+                                        <td>{p.phone || '—'}</td>
+                                        <td>{p.transactionId || '—'}</td>
+                                        <td>{p.amount ? `₹${p.amount}` : '—'}</td>
                                         <td><Badge variant={p.attended ? 'success' : 'default'}>{p.attended ? 'Attended' : 'Pending'}</Badge></td>
                                     </tr>
                                 ))}
