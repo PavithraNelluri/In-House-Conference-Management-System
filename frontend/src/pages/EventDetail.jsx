@@ -1,735 +1,1296 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-    getEvent,
-    getParticipants,
-    getAssignableUsers,
-    importParticipants,
-    sendQRCodes,
-    sendCertificates,
-    sendReceipts,
-    sendNotifications,
-    assignUserToEvent,
-    unassignUserFromEvent,
-    previewCertificate
-} from '../services/api';
-import { usePage } from '../contexts/PageContext';
-import StatCard from '../components/StatCard';
-import Card from '../components/Card';
-import Badge from '../components/Badge';
-import Modal from '../components/Modal';
-import ConfirmDialog from '../components/ConfirmDialog';
-import Toast from '../components/Toast';
-import '../styles//EventDetail.css';
+  getEvent,
+  getParticipants,
+  getAssignableUsers,
+  importParticipants,
+  sendQRCodes,
+  sendCertificates,
+  sendReceipts,
+  sendNotifications,
+  assignUserToEvent,
+  unassignUserFromEvent,
+  previewCertificate,
+} from "../services/api";
+import { usePage } from "../contexts/PageContext";
+import StatCard from "../components/StatCard";
+import Card from "../components/Card";
+import Badge from "../components/Badge";
+import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import Toast from "../components/Toast";
+import SignatureCanvas from "../components/SignatureCanvas";
+import "./EventDetail.css";
 
-const IconUsers = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /></svg>;
-const IconCheck = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
-const IconCreditCard = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>;
+const IconUsers = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+  </svg>
+);
+const IconCheck = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+const IconCreditCard = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <rect x="1" y="4" width="22" height="16" rx="2" />
+    <line x1="1" y1="10" x2="23" y2="10" />
+  </svg>
+);
 
 function EventDetail() {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { setPage } = usePage();
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const [event, setEvent] = useState(null);
-    const [participants, setParticipants] = useState([]);
-    const [assignableUsers, setAssignableUsers] = useState([]);
-    const [selectedAssignee, setSelectedAssignee] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [showImport, setShowImport] = useState(false);
-    const [showNotify, setShowNotify] = useState(false);
-    const [showAssignments, setShowAssignments] = useState(false);
-    const [notification, setNotification] = useState({ subject: '', message: '' });
-    const [toast, setToast] = useState(null);
-    const [actionLoading, setActionLoading] = useState('');
-    const [assignmentLoading, setAssignmentLoading] = useState('');
-    const [confirmAction, setConfirmAction] = useState(null);
-    const [importConfirm, setImportConfirm] = useState(null);
-    const fileInputRef = useRef(null);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { setPage } = usePage();
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const [event, setEvent] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [assignableUsers, setAssignableUsers] = useState([]);
+  const [selectedAssignee, setSelectedAssignee] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [showImport, setShowImport] = useState(false);
+  const [showNotify, setShowNotify] = useState(false);
+  const [showAssignments, setShowAssignments] = useState(false);
+  const [notification, setNotification] = useState({
+    subject: "",
+    message: "",
+  });
+  const [toast, setToast] = useState(null);
+  const [actionLoading, setActionLoading] = useState("");
+  const [assignmentLoading, setAssignmentLoading] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [importConfirm, setImportConfirm] = useState(null);
+  const fileInputRef = useRef(null);
 
-    // Certificate config with font sizes
-    const [certificateConfig, setCertificateConfig] = useState({
-        coords: {
-            name: { x: 363, y: 279 },
-            department: { x: 364, y: 306 }
-        },
-        fontSize: {
-            name: 11,
-            department: 11
-        }
-    });
+const [tempConfig, setTempConfig] = useState({
+    coords: {
+        name: { x: 240, y: 166 },
+        department: { x: 148, y: 187 }
+    },
+    fontSize: {
+        name: 11,
+        department: 11
+    },
+    signature: null,
+    signaturePosition: { x: 50, y: 250 },
+    signatureBgColor: '#ffffff'
+});
 
-    // Temporary state for form inputs (before running preview)
-    const [tempConfig, setTempConfig] = useState({
-        coords: {
-            name: { x: 240, y: 166 },
-            department: { x: 148, y: 187 }
-        },
-        fontSize: {
-            name: 11,
-            department: 11
-        }
-    });
+const [certificateConfig, setCertificateConfig] = useState({
+    coords: {
+        name: { x: 240, y: 166 },
+        department: { x: 148, y: 187 }
+    },
+    fontSize: {
+        name: 11,
+        department: 11
+    },
+    signature: null,
+    signaturePosition: { x: 50, y: 250 },
+    signatureBgColor: '#ffffff'
+});
 
-    const [pdfUrl, setPdfUrl] = useState(null);
-    const [showCertPreview, setShowCertPreview] = useState(false);
-    const [previewLoading, setPreviewLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [showCertPreview, setShowCertPreview] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
-    useEffect(() => { loadData(); }, [id]);
-    useEffect(() => {
-        if (event && canManageAssignments(event)) {
-            loadAssignableUsers();
-        }
-    }, [event]);
+  useEffect(() => {
+    loadData();
+  }, [id]);
 
-    useEffect(() => {
-        if (event) {
-            const canManage = canManageAssignments(event);
-            setPage(
-                event.name,
-                `${new Date(event.date).toLocaleDateString()} — ${participants.length} participants`,
-                <>
-                    {canManage && <button onClick={() => setShowAssignments(true)} className="btn-secondary btn-sm" disabled={!!actionLoading || !!assignmentLoading}>Manage Access</button>}
-                    <button onClick={() => setShowImport(true)} className="btn-secondary btn-sm" disabled={!!actionLoading}>Import CSV</button>
-                    <button onClick={() => setShowNotify(true)} className="btn-secondary btn-sm" disabled={!!actionLoading}>Notify</button>
-                    <button onClick={() => navigate('/events')} className="btn-ghost btn-sm">Back</button>
-                </>
-            );
-        }
-    }, [event, participants.length, actionLoading]);
+  useEffect(() => {
+    if (event && canManageAssignments(event)) {
+      loadAssignableUsers();
+    }
+  }, [event]);
 
-    // Load initial preview when modal opens
-    useEffect(() => {
-        if (showCertPreview && !pdfUrl) {
-            handleRunPreview();
-        }
-    }, [showCertPreview]);
-
-    const handleRunPreview = async () => {
-        setPreviewLoading(true);
-        try {
-            const res = await previewCertificate(id, {
-                ...tempConfig,
-                previewWidth: 600,
-                previewHeight: 394
-            });
-            const url = URL.createObjectURL(res.data);
-            setPdfUrl(url);
-            // Update main config after successful preview
-            setCertificateConfig(tempConfig);
-        } catch (err) {
-            console.error('Failed to load preview:', err);
-            setToast({ message: 'Failed to load certificate preview', type: 'error' });
-        } finally {
-            setPreviewLoading(false);
-        }
-    };
-
-    const loadData = async () => {
-        try {
-            const [eventRes, participantsRes] = await Promise.all([getEvent(id), getParticipants(id)]);
-            setEvent(eventRes.data);
-            setParticipants(participantsRes.data);
-        } catch (error) {
-            console.error('Failed to load data:', error);
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-
-    const getCurrentUserId = () => currentUser.id || currentUser._id;
-    const isEventCreator = (loadedEvent) => {
-        const creatorId = loadedEvent?.createdBy?._id || loadedEvent?.createdBy;
-        return creatorId === getCurrentUserId();
-    };
-    const canManageAssignments = (loadedEvent) => currentUser.role === 'superadmin' || (currentUser.role === 'admin' && isEventCreator(loadedEvent));
-
-    const loadAssignableUsers = async () => {
-        try {
-            const response = await getAssignableUsers();
-            setAssignableUsers(response.data);
-        } catch (error) {
-            console.error('Failed to load assignable users:', error);
-        }
-    };
-
-    const downloadTemplate = () => {
-        const headers = 'name,email,phone,transactionId,transactionTime,amount,paymentMode';
-        const example = 'John Doe,john@example.com,9876543210,TXN123456,2026-02-09 10:30,500,UPI';
-        const blob = new Blob([`${headers}\n${example}`], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'participants_template.csv';
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const lines = event.target.result.split('\n').filter(l => l.trim());
-                if (lines.length < 2) {
-                    setToast({ message: 'CSV file is empty', type: 'error' });
-                    return;
-                }
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-                const parsed = [];
-                for (let i = 1; i < lines.length; i++) {
-                    const values = lines[i].split(',').map(v => v.trim());
-                    if (values.length < 2) continue;
-                    const p = {};
-                    headers.forEach((h, idx) => {
-                        const v = values[idx] || '';
-                        if (h === 'name') p.name = v;
-                        else if (h === 'email') p.email = v;
-                        else if (h === 'phone' || h === 'mobile') p.phone = v;
-                        else if (h.includes('transactionid') || h === 'txn_id') p.transactionId = v;
-                        else if (h.includes('transactiontime') || h === 'txn_time') p.transactionTime = v;
-                        else if (h === 'amount') p.amount = v;
-                        else if (h.includes('paymentmode') || h === 'mode') p.paymentMode = v;
-                    });
-                    if (p.name && p.email) parsed.push(p);
-                }
-                if (parsed.length === 0) {
-                    setToast({ message: 'No valid participants found', type: 'error' });
-                    return;
-                }
-                setImportConfirm({ count: parsed.length, data: parsed });
-            } catch {
-                setToast({ message: 'Failed to parse CSV', type: 'error' });
-            }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    };
-
-    const doImport = async () => {
-        if (!importConfirm) return;
-        try {
-            const response = await importParticipants(id, importConfirm.data);
-            setToast({ message: response.data.message, type: 'success' });
-            setShowImport(false);
-            loadData();
-        } catch {
-            setToast({ message: 'Failed to import', type: 'error' });
-        }
-        finally {
-            setImportConfirm(null);
-        }
-    };
-
-    const requestAction = (action, label, warning) => setConfirmAction({ action, label, warning });
-
-    const executeAction = async () => {
-        if (!confirmAction) return;
-        const { action, label } = confirmAction;
-        setConfirmAction(null);
-        setActionLoading(label);
-        try {
-            const res = await action(id);
-            setToast({ message: res.data.message, type: 'success' });
-        }
-        catch {
-            setToast({ message: `Failed: ${label}`, type: 'error' });
-        }
-        finally {
-            setActionLoading('');
-        }
-    };
-
-    const handleSendNotification = async () => {
-        if (!notification.subject.trim() || !notification.message.trim()) {
-            setToast({ message: 'Subject and message are required', type: 'error' });
-            return;
-        }
-        try {
-            const res = await sendNotifications(id, notification);
-            setToast({ message: res.data.message, type: 'success' });
-            setShowNotify(false);
-            setNotification({ subject: '', message: '' });
-        }
-        catch {
-            setToast({ message: 'Failed to send notifications', type: 'error' });
-        }
-    };
-
-    const handleAssignUser = async () => {
-        if (!selectedAssignee) {
-            setToast({ message: 'Select an admin or sub-admin first', type: 'error' });
-            return;
-        }
-
-        setAssignmentLoading('assign');
-        try {
-            const response = await assignUserToEvent(id, selectedAssignee);
-            setEvent(response.data);
-            setSelectedAssignee('');
-            setToast({ message: 'User assigned to event', type: 'success' });
-        } catch (error) {
-            setToast({ message: error.response?.data?.message || 'Failed to assign user', type: 'error' });
-        } finally {
-            setAssignmentLoading('');
-        }
-    };
-
-    const handleUnassignUser = async (userId) => {
-        setAssignmentLoading(userId);
-        try {
-            const response = await unassignUserFromEvent(id, userId);
-            setEvent(response.data);
-            setToast({ message: 'User removed from event', type: 'success' });
-        } catch (error) {
-            setToast({ message: error.response?.data?.message || 'Failed to remove user', type: 'error' });
-        } finally {
-            setAssignmentLoading('');
-        }
-    };
-
-    const handleCertPreviewOpen = () => {
-        setPdfUrl(null);
-        setTempConfig(certificateConfig);
-        setShowCertPreview(true);
-    };
-
-    if (loading) return <div className="loading"><div className="spinner"></div> Loading...</div>;
-    if (!event) return <div className="empty-state"><p>Event not found</p></div>;
-
-    const attendedCount = participants.filter(p => p.attended).length;
-    const withPayment = participants.filter(p => p.transactionId).length;
-    const attendanceRate = participants.length > 0 ? Math.round((attendedCount / participants.length) * 100) : 0;
-    const creatorId = event.createdBy?._id || event.createdBy;
-    const assignedUserIds = new Set((event.assignedUsers || []).map((user) => user._id || user));
-    const availableAssignees = assignableUsers.filter((user) => !assignedUserIds.has(user._id) && user._id !== creatorId);
-    const allowAssignmentManagement = canManageAssignments(event);
-
-    return (
-        <div>
-            <div className="action-buttons">
-                <button onClick={() => requestAction(sendQRCodes, 'QR Codes', `This will send QR code emails to all ${participants.length} participants.`)} className="btn-secondary" disabled={!!actionLoading}>
-                    {actionLoading === 'QR Codes' ? 'Sending...' : 'Send QR Codes'}
-                </button>
-                <button onClick={() => requestAction(sendReceipts, 'Receipts', `This will send receipt emails to ${withPayment} participants with payment data.`)} className="btn-secondary" disabled={!!actionLoading || withPayment === 0}>
-                    {actionLoading === 'Receipts' ? 'Sending...' : 'Send Receipts'}
-                </button>
-
-                <button
-                    onClick={handleCertPreviewOpen}
-                    className="btn-secondary"
-                    disabled={!!actionLoading || attendedCount === 0}
-                >
-                    Send Certificates
-                </button>
-            </div>
-
-            <div className="stats-grid">
-                <StatCard icon={<IconUsers />} label="Participants" value={participants.length} color="primary" />
-                <StatCard icon={<IconCheck />} label="Attended" value={`${attendedCount} (${attendanceRate}%)`} color="success" />
-                <StatCard icon={<IconCreditCard />} label="With Payment" value={withPayment} color="warning" />
-            </div>
-
-            {/* Import Modal */}
-            <Modal isOpen={showImport} onClose={() => setShowImport(false)} title="Import Participants">
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-4)' }}>Upload a CSV file with participant details.</p>
-                <div className="warning-box"><strong>Warning:</strong> Duplicate rows are matched by email. Only the first occurrence for each email is imported.</div>
-                <div className="import-actions">
-                    <button onClick={downloadTemplate} className="btn-secondary">Download Template</button>
-                    <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
-                    <button onClick={() => fileInputRef.current?.click()} className="btn-primary">Upload CSV File</button>
-                </div>
-                <div className="template-info">
-                    <h4>Required: name, email</h4>
-                    <h4>Optional: phone, transactionId, transactionTime, amount, paymentMode</h4>
-                </div>
-            </Modal>
-
-            {/* Certificate Configuration Modal */}
-            <Modal
-                isOpen={showCertPreview}
-                onClose={() => setShowCertPreview(false)}
-                title="Configure & Preview Certificate"
-                size="xl"
+  useEffect(() => {
+    if (event) {
+      const canManage = canManageAssignments(event);
+      setPage(
+        event.name,
+        `${new Date(event.date).toLocaleDateString()} — ${participants.length} participants`,
+        <>
+          {canManage && (
+            <button
+              onClick={() => setShowAssignments(true)}
+              className="btn-secondary btn-sm"
+              disabled={!!actionLoading || !!assignmentLoading}
             >
-                <div className="cert-preview-container">
-                    {/* Left: Certificate Preview */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div className="cert-preview-wrapper">
-                            {previewLoading ? (
-                                <div style={{ width: '600px', height: '394px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <p>Generating preview...</p>
-                                </div>
-                            ) : pdfUrl ? (
-                                <iframe
-                                    src={pdfUrl}
-                                    width="600"
-                                    height="394"
-                                    style={{ border: 'none', display: 'block' }}
-                                    id="cert-preview-iframe"
-                                />
-                            ) : (
-                                <div style={{ width: '600px', height: '394px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <p>Click "Run Preview" to generate certificate preview</p>
-                                </div>
-                            )}
-                        </div>
+              Manage Access
+            </button>
+          )}
+          <button
+            onClick={() => setShowImport(true)}
+            className="btn-secondary btn-sm"
+            disabled={!!actionLoading}
+          >
+            Import CSV
+          </button>
+          <button
+            onClick={() => setShowNotify(true)}
+            className="btn-secondary btn-sm"
+            disabled={!!actionLoading}
+          >
+            Notify
+          </button>
+          <button
+            onClick={() => navigate("/events")}
+            className="btn-ghost btn-sm"
+          >
+            Back
+          </button>
+        </>,
+      );
+    }
+  }, [event, participants.length, actionLoading]);
 
-                        <p style={{ fontSize: '12px', color: '#7f8c8d', margin: '0' }}>
-                            Adjust settings below and click "Run Preview" to see changes
-                        </p>
-                    </div>
+  // Load initial preview when modal opens
+useEffect(() => {
+    if (showCertPreview && !pdfUrl) {
+        handleRunPreview();
+    }
+}, [showCertPreview]);
 
-                    {/* Right: Control Panel */}
-                    <div className="cert-controls">
-                        {/* Name Configuration */}
-                        <div className="cert-field-group">
-                            <h4>Name Position & Font</h4>
+// Auto-update preview when signature position or colors change
+useEffect(() => {
+    if (showCertPreview && pdfUrl) {
+        const delayTimer = setTimeout(() => {
+            handleRunPreview();
+        }, 500); // Debounce for 500ms to avoid too many requests
+        return () => clearTimeout(delayTimer);
+    }
+}, [tempConfig.signaturePosition, tempConfig.signatureBgColor]);
 
-                            <div className="cert-coord-inputs">
-                                <div className="cert-coord-input">
-                                    <label>X Coordinate</label>
-                                    <input
-                                        type="number"
-                                        value={tempConfig.coords.name.x}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                name: { ...prev.coords.name, x: parseInt(e.target.value) || 0 }
-                                            }
-                                        }))}
-                                        min="0"
-                                        max="600"
-                                    />
-                                </div>
+  const handleRunPreview = async () => {
+    setPreviewLoading(true);
+    try {
+      const previewConfig = {
+        coords: tempConfig.coords,
+        fontSize: tempConfig.fontSize,
+        signature: tempConfig.signature,
+        previewWidth: 600,
+        previewHeight: 394,
+      };
 
-                                <div className="cert-coord-input">
-                                    <label>Y Coordinate</label>
-                                    <input
-                                        type="number"
-                                        value={tempConfig.coords.name.y}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                name: { ...prev.coords.name, y: parseInt(e.target.value) || 0 }
-                                            }
-                                        }))}
-                                        min="0"
-                                        max="394"
-                                    />
-                                </div>
-                            </div>
+      const res = await previewCertificate(id, previewConfig);
+      const url = URL.createObjectURL(res.data);
+      setPdfUrl(url);
 
-                            <div style={{ marginTop: '10px' }}>
-                                <div className="cert-coord-slider">
-                                    <label>X Slider</label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="600"
-                                        value={tempConfig.coords.name.x}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                name: { ...prev.coords.name, x: parseInt(e.target.value) }
-                                            }
-                                        }))}
-                                    />
-                                </div>
+      // Update main config after successful preview
+      setCertificateConfig(tempConfig);
+    } catch (err) {
+      console.error("Failed to load preview:", err);
+      setToast({
+        message: "Failed to load certificate preview",
+        type: "error",
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
-                                <div className="cert-coord-slider" style={{ marginTop: '10px' }}>
-                                    <label>Y Slider</label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="394"
-                                        value={tempConfig.coords.name.y}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                name: { ...prev.coords.name, y: parseInt(e.target.value) }
-                                            }
-                                        }))}
-                                    />
-                                </div>
-                            </div>
+  const loadData = async () => {
+    try {
+      const [eventRes, participantsRes] = await Promise.all([
+        getEvent(id),
+        getParticipants(id),
+      ]);
+      setEvent(eventRes.data);
+      setParticipants(participantsRes.data);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                            {/* Font Size for Name */}
-                            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #ddd' }}>
-                                <div className="cert-coord-slider">
-                                    <label>Font Size: {tempConfig.fontSize.name}pt</label>
-                                    <input
-                                        type="range"
-                                        min="6"
-                                        max="32"
-                                        value={tempConfig.fontSize.name}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            fontSize: {
-                                                ...prev.fontSize,
-                                                name: parseInt(e.target.value)
-                                            }
-                                        }))}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+  const getCurrentUserId = () => currentUser.id || currentUser._id;
+  const isEventCreator = (loadedEvent) => {
+    const creatorId = loadedEvent?.createdBy?._id || loadedEvent?.createdBy;
+    return creatorId === getCurrentUserId();
+  };
+  const canManageAssignments = (loadedEvent) =>
+    currentUser.role === "superadmin" ||
+    (currentUser.role === "admin" && isEventCreator(loadedEvent));
 
-                        {/* Department Configuration */}
-                        <div className="cert-field-group">
-                            <h4>Department Position & Font</h4>
+  const loadAssignableUsers = async () => {
+    try {
+      const response = await getAssignableUsers();
+      setAssignableUsers(response.data);
+    } catch (error) {
+      console.error("Failed to load assignable users:", error);
+    }
+  };
 
-                            <div className="cert-coord-inputs">
-                                <div className="cert-coord-input">
-                                    <label>X Coordinate</label>
-                                    <input
-                                        type="number"
-                                        value={tempConfig.coords.department.x}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                department: { ...prev.coords.department, x: parseInt(e.target.value) || 0 }
-                                            }
-                                        }))}
-                                        min="0"
-                                        max="600"
-                                    />
-                                </div>
+  const downloadTemplate = () => {
+    const headers =
+      "name,email,phone,transactionId,transactionTime,amount,paymentMode";
+    const example =
+      "John Doe,john@example.com,9876543210,TXN123456,2026-02-09 10:30,500,UPI";
+    const blob = new Blob([`${headers}\n${example}`], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "participants_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-                                <div className="cert-coord-input">
-                                    <label>Y Coordinate</label>
-                                    <input
-                                        type="number"
-                                        value={tempConfig.coords.department.y}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                department: { ...prev.coords.department, y: parseInt(e.target.value) || 0 }
-                                            }
-                                        }))}
-                                        min="0"
-                                        max="394"
-                                    />
-                                </div>
-                            </div>
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const lines = event.target.result.split("\n").filter((l) => l.trim());
+        if (lines.length < 2) {
+          setToast({ message: "CSV file is empty", type: "error" });
+          return;
+        }
+        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+        const parsed = [];
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(",").map((v) => v.trim());
+          if (values.length < 2) continue;
+          const p = {};
+          headers.forEach((h, idx) => {
+            const v = values[idx] || "";
+            if (h === "name") p.name = v;
+            else if (h === "email") p.email = v;
+            else if (h === "phone" || h === "mobile") p.phone = v;
+            else if (h.includes("transactionid") || h === "txn_id")
+              p.transactionId = v;
+            else if (h.includes("transactiontime") || h === "txn_time")
+              p.transactionTime = v;
+            else if (h === "amount") p.amount = v;
+            else if (h.includes("paymentmode") || h === "mode")
+              p.paymentMode = v;
+          });
+          if (p.name && p.email) parsed.push(p);
+        }
+        if (parsed.length === 0) {
+          setToast({ message: "No valid participants found", type: "error" });
+          return;
+        }
+        setImportConfirm({ count: parsed.length, data: parsed });
+      } catch {
+        setToast({ message: "Failed to parse CSV", type: "error" });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
-                            <div style={{ marginTop: '10px' }}>
-                                <div className="cert-coord-slider">
-                                    <label>X Slider</label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="600"
-                                        value={tempConfig.coords.department.x}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                department: { ...prev.coords.department, x: parseInt(e.target.value) }
-                                            }
-                                        }))}
-                                    />
-                                </div>
+  const doImport = async () => {
+    if (!importConfirm) return;
+    try {
+      const response = await importParticipants(id, importConfirm.data);
+      setToast({ message: response.data.message, type: "success" });
+      setShowImport(false);
+      loadData();
+    } catch {
+      setToast({ message: "Failed to import", type: "error" });
+    } finally {
+      setImportConfirm(null);
+    }
+  };
 
-                                <div className="cert-coord-slider" style={{ marginTop: '10px' }}>
-                                    <label>Y Slider</label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="394"
-                                        value={tempConfig.coords.department.y}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            coords: {
-                                                ...prev.coords,
-                                                department: { ...prev.coords.department, y: parseInt(e.target.value) }
-                                            }
-                                        }))}
-                                    />
-                                </div>
-                            </div>
+  const requestAction = (action, label, warning) =>
+    setConfirmAction({ action, label, warning });
 
-                            {/* Font Size for Department */}
-                            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #ddd' }}>
-                                <div className="cert-coord-slider">
-                                    <label>Font Size: {tempConfig.fontSize.department}pt</label>
-                                    <input
-                                        type="range"
-                                        min="6"
-                                        max="32"
-                                        value={tempConfig.fontSize.department}
-                                        onChange={(e) => setTempConfig(prev => ({
-                                            ...prev,
-                                            fontSize: {
-                                                ...prev.fontSize,
-                                                department: parseInt(e.target.value)
-                                            }
-                                        }))}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+  const executeAction = async () => {
+    if (!confirmAction) return;
+    const { action, label } = confirmAction;
+    setConfirmAction(null);
+    setActionLoading(label);
+    try {
+      const res = await action(id);
+      setToast({ message: res.data.message, type: "success" });
+    } catch {
+      setToast({ message: `Failed: ${label}`, type: "error" });
+    } finally {
+      setActionLoading("");
+    }
+  };
 
-                        {/* Run Preview Button */}
-                        <button
-                            className="btn-primary"
-                            onClick={handleRunPreview}
-                            disabled={previewLoading}
-                            style={{ width: '100%' }}
-                        >
-                            {previewLoading ? 'Generating...' : '▶ Run Preview'}
-                        </button>
-                    </div>
-                </div>
+  const handleSendNotification = async () => {
+    if (!notification.subject.trim() || !notification.message.trim()) {
+      setToast({ message: "Subject and message are required", type: "error" });
+      return;
+    }
+    try {
+      const res = await sendNotifications(id, notification);
+      setToast({ message: res.data.message, type: "success" });
+      setShowNotify(false);
+      setNotification({ subject: "", message: "" });
+    } catch {
+      setToast({ message: "Failed to send notifications", type: "error" });
+    }
+  };
 
-                <div className="modal-form-actions" style={{ marginTop: '20px' }}>
-                    <button
-                        className="btn-secondary"
-                        onClick={() => setShowCertPreview(false)}
-                    >
-                        Cancel
-                    </button>
+  const handleAssignUser = async () => {
+    if (!selectedAssignee) {
+      setToast({
+        message: "Select an admin or sub-admin first",
+        type: "error",
+      });
+      return;
+    }
 
-                    <button
-                        className="btn-primary"
-                        onClick={async () => {
-                            setShowCertPreview(false);
-                            await requestAction(
-                                (id) => sendCertificates(id, {
-                                    ...certificateConfig
-                                }),
-                                'Certificates',
-                                `This will send certificates to ${attendedCount} participants.`
-                            );
-                        }}
-                    >
-                        Confirm & Send
-                    </button>
-                </div>
-            </Modal>
+    setAssignmentLoading("assign");
+    try {
+      const response = await assignUserToEvent(id, selectedAssignee);
+      setEvent(response.data);
+      setSelectedAssignee("");
+      setToast({ message: "User assigned to event", type: "success" });
+    } catch (error) {
+      setToast({
+        message: error.response?.data?.message || "Failed to assign user",
+        type: "error",
+      });
+    } finally {
+      setAssignmentLoading("");
+    }
+  };
 
-            {/* Notification Modal */}
-            <Modal isOpen={showNotify} onClose={() => setShowNotify(false)} title="Send Notification">
-                <div className="warning-box">This will send an email to all {participants.length} participants.</div>
-                <div className="form-group"><label>Subject</label><input type="text" value={notification.subject} onChange={(e) => setNotification({ ...notification, subject: e.target.value })} placeholder="e.g., Thank You for Attending" /></div>
-                <div className="form-group"><label>Message</label><textarea value={notification.message} onChange={(e) => setNotification({ ...notification, message: e.target.value })} placeholder="Enter your message here..." rows="5"></textarea></div>
-                <div className="modal-form-actions">
-                    <button className="btn-secondary" onClick={() => setShowNotify(false)}>Cancel</button>
-                    <button className="btn-primary" onClick={handleSendNotification}>Send to All</button>
-                </div>
-            </Modal>
+  const handleUnassignUser = async (userId) => {
+    setAssignmentLoading(userId);
+    try {
+      const response = await unassignUserFromEvent(id, userId);
+      setEvent(response.data);
+      setToast({ message: "User removed from event", type: "success" });
+    } catch (error) {
+      setToast({
+        message: error.response?.data?.message || "Failed to remove user",
+        type: "error",
+      });
+    } finally {
+      setAssignmentLoading("");
+    }
+  };
 
-            {/* Assignments Modal */}
-            <Modal isOpen={showAssignments} onClose={() => setShowAssignments(false)} title="Manage Event Access" size="lg">
-                <div className="form-row">
-                    <div>
-                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 'var(--sp-2)' }}>Created By</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
-                            <strong>{event.createdBy?.name}</strong>
-                            <span>{event.createdBy?.email}</span>
-                            <Badge variant={event.createdBy?.role}>{event.createdBy?.role}</Badge>
-                        </div>
-                    </div>
-                    <div>
-                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 'var(--sp-2)' }}>Assign Admin / Sub-Admin</p>
-                        <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
-                            <select value={selectedAssignee} onChange={(e) => setSelectedAssignee(e.target.value)} style={{ minWidth: 260 }}>
-                                <option value="">Select a user</option>
-                                {availableAssignees.map((user) => (
-                                    <option key={user._id} value={user._id}>
-                                        {user.name} ({user.role})
-                                    </option>
-                                ))}
-                            </select>
-                            <button onClick={handleAssignUser} className="btn-primary" disabled={assignmentLoading === 'assign' || availableAssignees.length === 0}>
-                                {assignmentLoading === 'assign' ? 'Assigning...' : 'Assign User'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+  const handleCertPreviewOpen = () => {
+    setPdfUrl(null);
+    setTempConfig(certificateConfig);
+    setShowCertPreview(true);
+  };
 
-                {availableAssignees.length === 0 && (
-                    <div className="warning-box" style={{ marginTop: 'var(--sp-4)' }}>
-                        All available admins and sub-admins are already assigned to this event.
-                    </div>
-                )}
+  const handleSignatureSave = (signatureData) => {
+    setTempConfig((prev) => ({
+      ...prev,
+      signature: signatureData,
+    }));
+  };
 
-                <div style={{ marginTop: 'var(--sp-5)' }}>
-                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 'var(--sp-3)' }}>Assigned Users</p>
-                    <div className="table-responsive">
-                        <table className="data-table">
-                            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Access</th><th>Actions</th></tr></thead>
-                            <tbody>
-                                {(event.assignedUsers || []).map((assignedUser) => {
-                                    const isCreator = assignedUser._id === creatorId;
-                                    return (
-                                        <tr key={assignedUser._id}>
-                                            <td>{assignedUser.name}</td>
-                                            <td>{assignedUser.email}</td>
-                                            <td><Badge variant={assignedUser.role}>{assignedUser.role}</Badge></td>
-                                            <td>{isCreator ? 'Creator' : 'Assigned'}</td>
-                                            <td>
-                                                {!isCreator ? (
-                                                    <button
-                                                        onClick={() => handleUnassignUser(assignedUser._id)}
-                                                        className="btn-danger btn-sm"
-                                                        disabled={assignmentLoading === assignedUser._id}
-                                                    >
-                                                        {assignmentLoading === assignedUser._id ? 'Removing...' : 'Remove'}
-                                                    </button>
-                                                ) : '—'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </Modal>
-
-            <ConfirmDialog isOpen={!!confirmAction} onClose={() => setConfirmAction(null)} onConfirm={executeAction} title={`Send ${confirmAction?.label || ''}?`} message={confirmAction?.warning} />
-            <ConfirmDialog isOpen={!!importConfirm} onClose={() => setImportConfirm(null)} onConfirm={doImport} title="Confirm Import" message={`Found ${importConfirm?.count || 0} valid participants to import.`} />
-
-            <h2 className="section-title">Participants</h2>
-            {participants.length === 0 ? (
-                <div className="empty-state">
-                    <div className="empty-state__icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg></div>
-                    <p>No participants yet. Import from CSV above.</p>
-                </div>
-            ) : (
-                <Card noPad>
-                    <div className="table-responsive">
-                        <table className="data-table">
-                            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Transaction ID</th><th>Amount</th><th>Status</th></tr></thead>
-                            <tbody>
-                                {participants.map(p => (
-                                    <tr key={p._id}>
-                                        <td>{p.name}</td>
-                                        <td>{p.email}</td>
-                                        <td>{p.phone || '—'}</td>
-                                        <td>{p.transactionId || '—'}</td>
-                                        <td>{p.amount ? `₹${p.amount}` : '—'}</td>
-                                        <td><Badge variant={p.attended ? 'success' : 'default'}>{p.attended ? 'Attended' : 'Pending'}</Badge></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
-            )}
-
-            {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-        </div>
+  if (loading)
+    return (
+      <div className="loading">
+        <div className="spinner"></div> Loading...
+      </div>
     );
+  if (!event)
+    return (
+      <div className="empty-state">
+        <p>Event not found</p>
+      </div>
+    );
+
+  const attendedCount = participants.filter((p) => p.attended).length;
+  const withPayment = participants.filter((p) => p.transactionId).length;
+  const attendanceRate =
+    participants.length > 0
+      ? Math.round((attendedCount / participants.length) * 100)
+      : 0;
+  const creatorId = event.createdBy?._id || event.createdBy;
+  const assignedUserIds = new Set(
+    (event.assignedUsers || []).map((user) => user._id || user),
+  );
+  const availableAssignees = assignableUsers.filter(
+    (user) => !assignedUserIds.has(user._id) && user._id !== creatorId,
+  );
+
+  return (
+    <div>
+      <div className="action-buttons">
+        <button
+          onClick={() =>
+            requestAction(
+              sendQRCodes,
+              "QR Codes",
+              `This will send QR code emails to all ${participants.length} participants.`,
+            )
+          }
+          className="btn-secondary"
+          disabled={!!actionLoading}
+        >
+          {actionLoading === "QR Codes" ? "Sending..." : "Send QR Codes"}
+        </button>
+        <button
+          onClick={() =>
+            requestAction(
+              sendReceipts,
+              "Receipts",
+              `This will send receipt emails to ${withPayment} participants with payment data.`,
+            )
+          }
+          className="btn-secondary"
+          disabled={!!actionLoading || withPayment === 0}
+        >
+          {actionLoading === "Receipts" ? "Sending..." : "Send Receipts"}
+        </button>
+
+        <button
+          onClick={handleCertPreviewOpen}
+          className="btn-secondary"
+          disabled={!!actionLoading || attendedCount === 0}
+        >
+          Send Certificates
+        </button>
+      </div>
+
+      <div className="stats-grid">
+        <StatCard
+          icon={<IconUsers />}
+          label="Participants"
+          value={participants.length}
+          color="primary"
+        />
+        <StatCard
+          icon={<IconCheck />}
+          label="Attended"
+          value={`${attendedCount} (${attendanceRate}%)`}
+          color="success"
+        />
+        <StatCard
+          icon={<IconCreditCard />}
+          label="With Payment"
+          value={withPayment}
+          color="warning"
+        />
+      </div>
+
+      {/* Import Modal */}
+      <Modal
+        isOpen={showImport}
+        onClose={() => setShowImport(false)}
+        title="Import Participants"
+      >
+        <p
+          style={{
+            fontSize: "var(--text-sm)",
+            color: "var(--text-secondary)",
+            marginBottom: "var(--sp-4)",
+          }}
+        >
+          Upload a CSV file with participant details.
+        </p>
+        <div className="warning-box">
+          <strong>Warning:</strong> Duplicate rows are matched by email. Only
+          the first occurrence for each email is imported.
+        </div>
+        <div className="import-actions">
+          <button onClick={downloadTemplate} className="btn-secondary">
+            Download Template
+          </button>
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: "none" }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn-primary"
+          >
+            Upload CSV File
+          </button>
+        </div>
+        <div className="template-info">
+          <h4>Required: name, email</h4>
+          <h4>
+            Optional: phone, transactionId, transactionTime, amount, paymentMode
+          </h4>
+        </div>
+      </Modal>
+
+      {/* Certificate Configuration Modal */}
+      <Modal
+        isOpen={showCertPreview}
+        onClose={() => setShowCertPreview(false)}
+        title="Configure & Preview Certificate"
+        size="xl"
+      >
+        <div className="cert-preview-container">
+          {/* Left: Certificate Preview */}
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            <div className="cert-preview-wrapper">
+              {previewLoading ? (
+                <div
+                  style={{
+                    width: "600px",
+                    height: "394px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <p>Generating preview...</p>
+                </div>
+              ) : pdfUrl ? (
+                <iframe
+                  src={pdfUrl}
+                  width="600"
+                  height="394"
+                  style={{ border: "none", display: "block" }}
+                  id="cert-preview-iframe"
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "600px",
+                    height: "394px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <p>Click "Run Preview" to generate certificate preview</p>
+                </div>
+              )}
+            </div>
+
+            <p style={{ fontSize: "12px", color: "#7f8c8d", margin: "0" }}>
+              Adjust settings below and click "Run Preview" to see changes
+            </p>
+          </div>
+
+          {/* Right: Control Panel */}
+          <div className="cert-controls">
+            {/* Name Configuration */}
+            <div className="cert-field-group">
+              <h4>📝 Name Position & Font</h4>
+
+              <div className="cert-coord-inputs">
+                <div className="cert-coord-input">
+                  <label>X Coordinate</label>
+                  <input
+                    type="number"
+                    value={tempConfig.coords.name.x}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          name: {
+                            ...prev.coords.name,
+                            x: parseInt(e.target.value) || 0,
+                          },
+                        },
+                      }))
+                    }
+                    min="0"
+                    max="600"
+                  />
+                </div>
+
+                <div className="cert-coord-input">
+                  <label>Y Coordinate</label>
+                  <input
+                    type="number"
+                    value={tempConfig.coords.name.y}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          name: {
+                            ...prev.coords.name,
+                            y: parseInt(e.target.value) || 0,
+                          },
+                        },
+                      }))
+                    }
+                    min="0"
+                    max="394"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: "10px" }}>
+                <div className="cert-coord-slider">
+                  <label>X Slider</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="600"
+                    value={tempConfig.coords.name.x}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          name: {
+                            ...prev.coords.name,
+                            x: parseInt(e.target.value),
+                          },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+
+                <div
+                  className="cert-coord-slider"
+                  style={{ marginTop: "10px" }}
+                >
+                  <label>Y Slider</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="394"
+                    value={tempConfig.coords.name.y}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          name: {
+                            ...prev.coords.name,
+                            y: parseInt(e.target.value),
+                          },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "12px",
+                  paddingTop: "12px",
+                  borderTop: "1px solid #ddd",
+                }}
+              >
+                <div className="cert-coord-slider">
+                  <label>Font Size: {tempConfig.fontSize.name}pt</label>
+                  <input
+                    type="range"
+                    min="6"
+                    max="32"
+                    value={tempConfig.fontSize.name}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        fontSize: {
+                          ...prev.fontSize,
+                          name: parseInt(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Department Configuration */}
+            <div className="cert-field-group">
+              <h4>🏢 Department Position & Font</h4>
+
+              <div className="cert-coord-inputs">
+                <div className="cert-coord-input">
+                  <label>X Coordinate</label>
+                  <input
+                    type="number"
+                    value={tempConfig.coords.department.x}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          department: {
+                            ...prev.coords.department,
+                            x: parseInt(e.target.value) || 0,
+                          },
+                        },
+                      }))
+                    }
+                    min="0"
+                    max="600"
+                  />
+                </div>
+
+                <div className="cert-coord-input">
+                  <label>Y Coordinate</label>
+                  <input
+                    type="number"
+                    value={tempConfig.coords.department.y}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          department: {
+                            ...prev.coords.department,
+                            y: parseInt(e.target.value) || 0,
+                          },
+                        },
+                      }))
+                    }
+                    min="0"
+                    max="394"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: "10px" }}>
+                <div className="cert-coord-slider">
+                  <label>X Slider</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="600"
+                    value={tempConfig.coords.department.x}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          department: {
+                            ...prev.coords.department,
+                            x: parseInt(e.target.value),
+                          },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+
+                <div
+                  className="cert-coord-slider"
+                  style={{ marginTop: "10px" }}
+                >
+                  <label>Y Slider</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="394"
+                    value={tempConfig.coords.department.y}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        coords: {
+                          ...prev.coords,
+                          department: {
+                            ...prev.coords.department,
+                            y: parseInt(e.target.value),
+                          },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "12px",
+                  paddingTop: "12px",
+                  borderTop: "1px solid #ddd",
+                }}
+              >
+                <div className="cert-coord-slider">
+                  <label>Font Size: {tempConfig.fontSize.department}pt</label>
+                  <input
+                    type="range"
+                    min="6"
+                    max="32"
+                    value={tempConfig.fontSize.department}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        fontSize: {
+                          ...prev.fontSize,
+                          department: parseInt(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Signature Section */}
+            {/* Signature Section */}
+            <div className="cert-field-group">
+              <h4>✍️ Digital Signature</h4>
+              <SignatureCanvas
+                onSignatureSave={handleSignatureSave}
+                onPositionChange={(position) =>
+                  setTempConfig((prev) => ({
+                    ...prev,
+                    signaturePosition: position,
+                  }))
+                }
+                initialSignature={tempConfig.signature}
+                initialPosition={tempConfig.signaturePosition}
+                backgroundColor={tempConfig.signatureBgColor || "#ffffff"}
+              />
+            </div>
+
+            {/* Signature Position Controls */}
+            <div className="cert-field-group">
+              <h4>📍 Signature Position on Certificate</h4>
+
+              <div className="cert-coord-inputs">
+                <div className="cert-coord-input">
+                  <label>X Coordinate</label>
+                  <input
+                    type="number"
+                    value={tempConfig.signaturePosition?.x || 50}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        signaturePosition: {
+                          ...prev.signaturePosition,
+                          x: parseInt(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    min="0"
+                    max="600"
+                  />
+                </div>
+
+                <div className="cert-coord-input">
+                  <label>Y Coordinate</label>
+                  <input
+                    type="number"
+                    value={tempConfig.signaturePosition?.y || 50}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        signaturePosition: {
+                          ...prev.signaturePosition,
+                          y: parseInt(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    min="0"
+                    max="394"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: "10px" }}>
+                <div className="cert-coord-slider">
+                  <label>X Slider</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="600"
+                    value={tempConfig.signaturePosition?.x || 50}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        signaturePosition: {
+                          ...prev.signaturePosition,
+                          x: parseInt(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </div>
+
+                <div
+                  className="cert-coord-slider"
+                  style={{ marginTop: "10px" }}
+                >
+                  <label>Y Slider</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="394"
+                    value={tempConfig.signaturePosition?.y || 50}
+                    onChange={(e) =>
+                      setTempConfig((prev) => ({
+                        ...prev,
+                        signaturePosition: {
+                          ...prev.signaturePosition,
+                          y: parseInt(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "12px",
+                  paddingTop: "12px",
+                  borderTop: "1px solid #ddd",
+                }}
+              >
+                <div className="cert-coord-input">
+                  <label>Signature Background Color</label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={tempConfig.signatureBgColor || "#ffffff"}
+                      onChange={(e) =>
+                        setTempConfig((prev) => ({
+                          ...prev,
+                          signatureBgColor: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "50px",
+                        height: "40px",
+                        cursor: "pointer",
+                      }}
+                    />
+                    <span style={{ fontSize: "12px", color: "#7f8c8d" }}>
+                      {tempConfig.signatureBgColor || "#ffffff"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Run Preview Button */}
+            <button
+              className="btn-primary"
+              onClick={handleRunPreview}
+              disabled={previewLoading}
+              style={{ width: "100%" }}
+            >
+              {previewLoading ? "Generating..." : "▶ Run Preview"}
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-form-actions" style={{ marginTop: "20px" }}>
+          <button
+            className="btn-secondary"
+            onClick={() => setShowCertPreview(false)}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="btn-primary"
+            onClick={async () => {
+              setShowCertPreview(false);
+              await requestAction(
+                (eventId) => sendCertificates(eventId, certificateConfig),
+                "Certificates",
+                `This will send certificates to ${attendedCount} participants.`,
+              );
+            }}
+          >
+            Confirm & Send
+          </button>
+        </div>
+      </Modal>
+
+      {/* Notification Modal */}
+      <Modal
+        isOpen={showNotify}
+        onClose={() => setShowNotify(false)}
+        title="Send Notification"
+      >
+        <div className="warning-box">
+          This will send an email to all {participants.length} participants.
+        </div>
+        <div className="form-group">
+          <label>Subject</label>
+          <input
+            type="text"
+            value={notification.subject}
+            onChange={(e) =>
+              setNotification({ ...notification, subject: e.target.value })
+            }
+            placeholder="e.g., Thank You for Attending"
+          />
+        </div>
+        <div className="form-group">
+          <label>Message</label>
+          <textarea
+            value={notification.message}
+            onChange={(e) =>
+              setNotification({ ...notification, message: e.target.value })
+            }
+            placeholder="Enter your message here..."
+            rows="5"
+          />
+        </div>
+        <div className="modal-form-actions">
+          <button
+            className="btn-secondary"
+            onClick={() => setShowNotify(false)}
+          >
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={handleSendNotification}>
+            Send to All
+          </button>
+        </div>
+      </Modal>
+
+      {/* Assignments Modal */}
+      <Modal
+        isOpen={showAssignments}
+        onClose={() => setShowAssignments(false)}
+        title="Manage Event Access"
+        size="lg"
+      >
+        <div className="form-row">
+          <div>
+            <p
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: "var(--sp-2)",
+              }}
+            >
+              Created By
+            </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--sp-2)",
+                flexWrap: "wrap",
+              }}
+            >
+              <strong>{event.createdBy?.name}</strong>
+              <span>{event.createdBy?.email}</span>
+              <Badge variant={event.createdBy?.role}>
+                {event.createdBy?.role}
+              </Badge>
+            </div>
+          </div>
+          <div>
+            <p
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: "var(--sp-2)",
+              }}
+            >
+              Assign Admin / Sub-Admin
+            </p>
+            <div
+              style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap" }}
+            >
+              <select
+                value={selectedAssignee}
+                onChange={(e) => setSelectedAssignee(e.target.value)}
+                style={{ minWidth: 260 }}
+              >
+                <option value="">Select a user</option>
+                {availableAssignees.map((user) => (
+                  <option key={user._id} value={user._id}>
+                    {user.name} ({user.role})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssignUser}
+                className="btn-primary"
+                disabled={
+                  assignmentLoading === "assign" ||
+                  availableAssignees.length === 0
+                }
+              >
+                {assignmentLoading === "assign"
+                  ? "Assigning..."
+                  : "Assign User"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {availableAssignees.length === 0 && (
+          <div className="warning-box" style={{ marginTop: "var(--sp-4)" }}>
+            All available admins and sub-admins are already assigned to this
+            event.
+          </div>
+        )}
+
+        <div style={{ marginTop: "var(--sp-5)" }}>
+          <p
+            style={{
+              fontSize: "var(--text-xs)",
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: "var(--sp-3)",
+            }}
+          >
+            Assigned Users
+          </p>
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Access</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(event.assignedUsers || []).map((assignedUser) => {
+                  const isCreator = assignedUser._id === creatorId;
+                  return (
+                    <tr key={assignedUser._id}>
+                      <td>{assignedUser.name}</td>
+                      <td>{assignedUser.email}</td>
+                      <td>
+                        <Badge variant={assignedUser.role}>
+                          {assignedUser.role}
+                        </Badge>
+                      </td>
+                      <td>{isCreator ? "Creator" : "Assigned"}</td>
+                      <td>
+                        {!isCreator ? (
+                          <button
+                            onClick={() => handleUnassignUser(assignedUser._id)}
+                            className="btn-danger btn-sm"
+                            disabled={assignmentLoading === assignedUser._id}
+                          >
+                            {assignmentLoading === assignedUser._id
+                              ? "Removing..."
+                              : "Remove"}
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={executeAction}
+        title={`Send ${confirmAction?.label || ""}?`}
+        message={confirmAction?.warning}
+      />
+      <ConfirmDialog
+        isOpen={!!importConfirm}
+        onClose={() => setImportConfirm(null)}
+        onConfirm={doImport}
+        title="Confirm Import"
+        message={`Found ${importConfirm?.count || 0} valid participants to import.`}
+      />
+
+      <h2 className="section-title">Participants</h2>
+      {participants.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state__icon">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+            </svg>
+          </div>
+          <p>No participants yet. Import from CSV above.</p>
+        </div>
+      ) : (
+        <Card noPad>
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Transaction ID</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participants.map((p) => (
+                  <tr key={p._id}>
+                    <td>{p.name}</td>
+                    <td>{p.email}</td>
+                    <td>{p.phone || "—"}</td>
+                    <td>{p.transactionId || "—"}</td>
+                    <td>{p.amount ? `₹${p.amount}` : "—"}</td>
+                    <td>
+                      <Badge variant={p.attended ? "success" : "default"}>
+                        {p.attended ? "Attended" : "Pending"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+    </div>
+  );
 }
 
 export default EventDetail;

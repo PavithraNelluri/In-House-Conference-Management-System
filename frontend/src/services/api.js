@@ -59,22 +59,27 @@ export const importParticipants = (eventId, participants) => api.post(`/particip
 export const sendQRCodes = (eventId, participantIds) => api.post(`/participants/send-qr/${eventId}`, { participantIds });
 export const markAttendance = (qrCode) => api.post('/participants/attendance', { qrCode });
 
-// Certificate APIs with coordinates support
-export const sendCertificates = (eventId, config) => 
-  api.post(`/participants/send-certificates/${eventId}`, {
-    coords: config.coords,
-    fontSize: config.fontSize,
-    participantIds: config.participantIds || []
-  });
+
 
 export const previewCertificate = (eventId, config) =>
   api.post(`/participants/preview-certificate/${eventId}`, {
     coords: config.coords,
     fontSize: config.fontSize,
+    signature: config.signature,
+    signaturePosition: config.signaturePosition,
     previewWidth: config.previewWidth,
     previewHeight: config.previewHeight
   }, {
     responseType: 'blob'
+  });
+
+export const sendCertificates = (eventId, config) => 
+  api.post(`/participants/send-certificates/${eventId}`, {
+    coords: config.coords,
+    fontSize: config.fontSize,
+    signature: config.signature,
+    signaturePosition: config.signaturePosition,
+    participantIds: config.participantIds || []
   });
 
 // Receipt and Notification APIs
