@@ -251,12 +251,10 @@ export const markAttendance = async (req, res) => {
 // };
 
 //updated
-// Send certificates with PDF
 export const sendCertificates = async (req, res) => {
   try {
     const { eventId } = req.params;
 
-    // Get coordinates and font sizes from frontend (with defaults)
     const coords = req.body.coords || {
       name: { x: 240, y: 166 },
       department: { x: 148, y: 187 }
@@ -265,6 +263,8 @@ export const sendCertificates = async (req, res) => {
       name: 11,
       department: 11
     };
+    const signature = req.body.signature || null;
+    const signaturePosition = req.body.signaturePosition || { x: 50, y: 250 };
     const { participantIds } = req.body;
 
     const { event, status, body } = await loadAccessibleEvent(eventId, req.user);
@@ -286,7 +286,9 @@ export const sendCertificates = async (req, res) => {
           name: p.name,
           department: p.department || "Department",
           coords,
-          fontSize
+          fontSize,
+          signature,
+          signaturePosition
         });
 
         await sendEmail({
@@ -318,17 +320,17 @@ export const sendCertificates = async (req, res) => {
   }
 };
 
-// Preview certificate with dynamic coordinates and font sizes
 export const previewCertificate = async (req, res) => {
   try {
-    const { coords, fontSize } = req.body;
+    const { coords, fontSize, signature, signaturePosition } = req.body;
 
-    // Use sample data for preview
     const pdfBuffer = await generateCertificate({
       name: "Sample Name",
       department: "Sample Department",
       coords,
-      fontSize
+      fontSize,
+      signature,
+      signaturePosition
     });
 
     res.setHeader("Content-Type", "application/pdf");
