@@ -338,15 +338,18 @@ button, .btn {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
 
 /* ---------- Password Field Styling ---------- */
-.form-group input[type="password"] {
-  padding-right: 40px !important;
+/* Hide browser's native password reveal icons */
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-contacts-auto-save-button,
+input[type="password"]::-webkit-outer-spin-button,
+input[type="password"]::-webkit-inner-spin-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  margin: 0 !important;
 }
 
-input[type="password"]::-webkit-credentials-auto-fill-button,
-input[type="password"]::-webkit-contacts-auto-save-button {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+input[type="password"]::-ms-reveal {
+  display: none !important;
 }
 
 /* ---------- Tables ---------- */
