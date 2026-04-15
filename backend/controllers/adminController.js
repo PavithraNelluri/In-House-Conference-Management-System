@@ -7,7 +7,7 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
     // Find user by email
-    const user = await Admin.findOne({ email });
+    const user = await Admin.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -49,7 +49,7 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Invalid email format' });
     }
     // Check if user exists
-    const existingUser = await Admin.findOne({ email });
+    const existingUser = await Admin.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already exists' });
     }
@@ -64,7 +64,7 @@ export const register = async (req, res) => {
     // Create user
     const user = new Admin({
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       role: role || 'admin'
     });
