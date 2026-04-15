@@ -62,5 +62,5 @@ export const previewCertificate = (eventId, payload) => api.post(`/participants/
 export const sendCertificates = (eventId, payload = {}) => api.post(`/participants/send-certificates/${eventId}`, payload);
 export const sendReceipts = (eventId, participantIds) => api.post(`/participants/send-receipts/${eventId}`, { participantIds });
 export const sendNotifications = (eventId, data) => api.post(`/participants/notify/${eventId}`, data);
-
+export const exportParticipants = (eventId, data) => api.post(`/participants/export/${eventId}`, data, {responseType: 'blob'});
 export default api;

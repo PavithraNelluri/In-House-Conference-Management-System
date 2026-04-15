@@ -446,3 +446,80 @@ export const sendNotifications = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Export Participants Data
+export const exportParticipants = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { type = 'all', columns = [] } = req.body;
+
+    const { event, status, body } = await loadAccessibleEvent(eventId, req.user);
+    if (!event) return res.status(status).json(body);
+
+    let query = { event: eventId };
+
+    
+    if (type === 'attended') {
+      query.attended = true;
+    }
+
+    const participants = await Participant.find(query);
+
+    if (!participants.length) {
+      return res.status(404).json({ message: 'No participants found' });
+    }
+
+    const dynamicFieldsSet = new Set();
+    participants.forEach(p => {
+      if (p.dataFields) {
+        for (let key of p.dataFields.keys()) {
+          dynamicFieldsSet.add(key);
+        }
+      }
+    });
+
+    const dynamicFields = Array.from(dynamicFieldsSet);
+
+    const columnMap = {
+      Name: p => p.name,
+      Email: p => p.email,
+      Department: p => p.department,
+      Phone: p => p.phone || '',
+      TransactionID: p => p.transactionId || '',
+      TransactionTime: p => p.transactionTime || '',
+      Amount: p => p.amount || '',
+      PaymentMode: p => p.paymentMode || '',
+      Status: p => (p.attended ? 'Attended' : 'Pending')
+    };
+
+    dynamicFields.forEach(field => {
+      columnMap[field] = p => p.dataFields?.get(field) || '';
+    });
+
+    // If no columns selected → export all
+    const selectedColumns = columns.length ? columns : Object.keys(columnMap);
+
+    const headers = selectedColumns;
+
+    const rows = participants.map(p =>
+      selectedColumns.map(col => {
+        const value = columnMap[col](p);
+        return `"${String(value).replace(/"/g, '""')}"`;
+      }).join(',')
+    );
+
+    const csvData = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=participants_${type}.csv`
+    );
+
+    res.send(csvData);
+
+  } catch (error) {
+    console.error("EXPORT ERROR:", error);
+    res.status(500).json({ message: 'Export failed' });
+  }
+};

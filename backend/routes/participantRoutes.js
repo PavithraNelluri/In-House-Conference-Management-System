@@ -16,5 +16,6 @@ router.post('/certificate-preview/:eventId', participantController.previewCertif
 router.post('/send-certificates/:eventId', participantController.sendCertificates);
 router.post('/send-receipts/:eventId', participantController.sendReceipts);
 router.post('/notify/:eventId', participantController.sendNotifications);
+router.post('/export/:eventId', participantController.exportParticipants);
 
 export default router;

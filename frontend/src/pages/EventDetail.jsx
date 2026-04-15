@@ -13,7 +13,8 @@ import {
     sendReceipts,
     sendNotifications,
     assignUserToEvent,
-    unassignUserFromEvent
+    unassignUserFromEvent,
+    exportParticipants 
 } from '../services/api';
 import { usePage } from '../contexts/PageContext';
 import StatCard from '../components/StatCard';
@@ -50,6 +51,12 @@ function EventDetail() {
     const [confirmAction, setConfirmAction] = useState(null);
     const [importConfirm, setImportConfirm] = useState(null);
     const fileInputRef = useRef(null);
+    const [showExport, setShowExport] = useState(false);
+    const [exportOptions, setExportOptions] = useState({
+        type: 'all',
+        columns: []
+    });
+    const [exportLoading, setExportLoading] = useState(false);
 
     const extraColumns = useMemo(() => 
         Array.from(
@@ -79,6 +86,21 @@ function EventDetail() {
                 <>
                     {canManage && <button onClick={() => setShowAssignments(true)} className="btn-secondary btn-sm" disabled={!!actionLoading || !!assignmentLoading}>Manage Access</button>}
                     <button onClick={() => setShowImport(true)} className="btn-secondary btn-sm" disabled={!!actionLoading}>Import Participants</button>
+                    <button 
+                        onClick={() => {
+                            if (participants.length === 0) {
+                                setToast({
+                                    message: 'No participants found',
+                                    type: 'error'
+                                });
+                                return;
+                            }
+                            setShowExport(true);
+                        }} 
+                        className={`btn-secondary btn-sm ${participants.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        Export Participants
+                    </button>
                     <button onClick={() => setShowNotify(true)} className="btn-secondary btn-sm" disabled={!!actionLoading}>Notify</button>
                     <button onClick={() => navigate('/events')} className="btn-ghost btn-sm">Back</button>
                 </>
@@ -380,6 +402,58 @@ function EventDetail() {
         }
     };
 
+    const handleExportFinal = async () => {
+
+        if (participants.length === 0) {
+            setToast({ message: 'No participants available', type: 'error' });
+            return;
+        }
+
+        if (exportOptions.type === 'attended' && participants.filter(p => p.attended).length === 0) {
+            setToast({ message: 'No attended participants found', type: 'error' });
+            return;
+        }
+
+        setExportLoading(true);
+
+        try {
+            const response = await exportParticipants(id, exportOptions);
+
+            if (!response || !response.data) {
+                throw new Error('Empty response');
+            }
+
+            const blob = new Blob([response.data], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `participants_${exportOptions.type}.csv`;
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+
+            setShowExport(false);
+            setToast({ message: 'Export successful', type: 'success' });
+
+        } catch (error) {
+            console.error(error);
+
+            const message =
+                error.response?.data?.message ||
+                error.message ||
+                'Export failed';
+
+            setToast({ message, type: 'error' });
+
+        } finally {
+            setExportLoading(false);
+        }
+    };
+
     if (loading) return <div className="loading"><div className="spinner"></div> Loading...</div>;
     if (!event) return <div className="empty-state"><p>Event not found</p></div>;
 
@@ -432,6 +506,150 @@ function EventDetail() {
                         <li><strong>Required:</strong> name, email, department</li>
                         <li><strong>Optional:</strong> phone (mobile, contact), transactionId (txn_id, txnid), transactionTime (txn_time, txntime), amount, paymentMode (mode)</li>
                     </ul>
+                </div>
+            </Modal>
+
+             {/* Export Modal */}
+            <Modal isOpen={showExport} onClose={() => setShowExport(false)} title="Export Options">
+
+                <div className="form-group">
+                    <label>Export Type</label>
+                    <select 
+                        value={exportOptions.type}
+                        onChange={(e) => setExportOptions({...exportOptions, type: e.target.value})}
+                    >
+                        <option value="all">All Participants</option>
+                        <option value="attended">Only Attended</option>
+                    </select>
+                </div>
+
+                <p style={{ fontSize: '12px', color: 'gray', marginTop: '6px' }}>
+                    {exportOptions.type === 'attended'
+                        ? `${participants.filter(p => p.attended).length} attended participants will be exported`
+                        : `${participants.length} participants will be exported`}
+                </p>
+
+                <div className="form-group">
+                    <label>Select Columns</label>
+
+                    <div style={{ marginBottom: '10px' }}>
+                        <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            onClick={() =>
+                                setExportOptions({
+                                    ...exportOptions,
+                                    columns: [
+                                        'Name','Email','Department','Phone',
+                                        'TransactionID','TransactionTime',
+                                        'Amount','PaymentMode','Status',
+                                        ...extraColumns
+                                    ]
+                                })
+                            }
+                        >
+                            Select All
+                        </button>
+
+                        <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            style={{ marginLeft: '8px' }}
+                            onClick={() =>
+                                setExportOptions({ ...exportOptions, columns: [] })
+                            }
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: '10px',
+                            maxHeight: '260px',
+                            overflowY: 'auto',
+                            paddingRight: '6px'
+                        }}
+                    >
+                        {[
+                            'Name','Email','Department','Phone',
+                            'TransactionID','TransactionTime',
+                            'Amount','PaymentMode','Status',
+                            ...extraColumns
+                        ].map((col) => {
+                            const isSelected = exportOptions.columns.includes(col);
+
+                            return (
+                                <div
+                                    key={col}
+                                    onClick={() => {
+                                        const updated = isSelected
+                                            ? exportOptions.columns.filter(c => c !== col)
+                                            : [...exportOptions.columns, col];
+
+                                        setExportOptions({
+                                            ...exportOptions,
+                                            columns: updated
+                                        });
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '10px',
+                                        padding: '10px 12px',
+                                        border: '1px solid var(--border-light)',
+                                        borderRadius: 'var(--radius-md)',
+                                        cursor: 'pointer',
+                                        background: isSelected
+                                            ? 'var(--primary-50)'
+                                            : 'var(--bg-card)',
+                                        transition: 'all var(--transition-fast)',
+                                        userSelect: 'none'
+                                    }}
+                                >
+                                    <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                                        {col}
+                                    </span>
+
+                                    <div
+                                        style={{
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '4px',
+                                            border: '2px solid var(--border-color)',
+                                            background: isSelected
+                                                ? 'var(--primary-500)'
+                                                : 'transparent',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            transition: 'all var(--transition-fast)'
+                                        }}
+                                    >
+                                        {isSelected && (
+                                            <span
+                                                style={{
+                                                    color: '#fff',
+                                                    fontSize: '12px',
+                                                    fontWeight: 'bold'
+                                                }}
+                                            >
+                                                ✓
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="modal-form-actions">
+                    <button className="btn-secondary" onClick={() => setShowExport(false)}>Cancel</button>
+                    <button className="btn-primary" onClick={handleExportFinal} disabled={exportLoading}>{exportLoading ? 'Exporting...' : 'Export'}</button>
                 </div>
             </Modal>
 
