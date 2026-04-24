@@ -50,6 +50,7 @@ export const importFromCSV = async (req, res) => {
     }
 
     const normalizeEmail = (email) => email.trim().toLowerCase();
+
     const existingParticipants = await Participant.find({ event: eventId }).select('email');
     const existingEmails = new Set(
       existingParticipants
@@ -58,32 +59,38 @@ export const importFromCSV = async (req, res) => {
         .map(normalizeEmail)
     );
 
-    const createdParticipants = [];
-    const seenEmails = new Set();
-    let skippedDuplicates = 0;
-    let skippedInvalid = 0; 
+    const uniqueParticipantsMap = new Map();
+    let skippedInvalid = 0;
 
     for (const p of participants) {
       const email = p.email?.trim();
       if (!p.name || !email || !p.department) {
-        skippedInvalid++;   
+        skippedInvalid++;
         continue;
       }
-
       const normalizedEmail = normalizeEmail(email);
-      if (seenEmails.has(normalizedEmail) || existingEmails.has(normalizedEmail)) {
-        skippedDuplicates++;
+      uniqueParticipantsMap.set(normalizedEmail, p);
+    }
+
+    const uniqueParticipants = Array.from(uniqueParticipantsMap.values());
+    const skippedDuplicates = participants.length - uniqueParticipants.length - skippedInvalid;
+
+    const createdParticipants = [];
+
+    for (const p of uniqueParticipants) {
+      const email = p.email.trim();
+      const normalizedEmail = normalizeEmail(email);
+
+      if (existingEmails.has(normalizedEmail)) {
         continue;
       }
-
-      seenEmails.add(normalizedEmail);
 
       const qrData = `${eventId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const participant = new Participant({
         name: p.name,
         email,
-        department: p.department, 
+        department: p.department,
         phone: p.phone || '',
         event: eventId,
         qrCode: qrData,
@@ -100,7 +107,7 @@ export const importFromCSV = async (req, res) => {
 
     res.status(201).json({
       message: `${createdParticipants.length} participants imported${
-        skippedDuplicates ? `, ${skippedDuplicates} duplicate email rows skipped` : ''
+        skippedDuplicates > 0 ? `, ${skippedDuplicates} duplicate rows skipped` : ''
       }${
         skippedInvalid ? `, ${skippedInvalid} invalid rows skipped` : ''
       }`,

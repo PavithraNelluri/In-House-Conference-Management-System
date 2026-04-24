@@ -784,7 +784,7 @@ function EventDetail() {
         </p>
         <div className="warning-box">
           <strong>Warning:</strong> Duplicate rows are matched by email. Only
-          the first occurrence for each email is imported.
+          the last occurrence for each email is imported.
         </div>
         <div className="import-actions">
           <button onClick={downloadTemplate} className="btn-secondary">
